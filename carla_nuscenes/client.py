@@ -5,6 +5,7 @@ from .walker import Walker
 import math
 from .utils import generate_token,get_nuscenes_rt,get_intrinsic,transform_timestamp,clamp
 import random
+import time
 
 class Client:
     def __init__(self,client_config):
@@ -13,7 +14,7 @@ class Client:
 
     def generate_world(self,world_config):
         print("generate world start!")
-        self.client.load_world(world_config["map_name"])
+        self.client.load_world_if_different(world_config["map_name"])
         self.world = self.client.get_world()
         self.original_settings = self.world.get_settings()
         self.world.unload_map_layer(carla.MapLayer.ParkedVehicles)
@@ -61,10 +62,10 @@ class Client:
         self.ego_vehicle.blueprint.set_attribute('role_name', 'hero')
         self.ego_vehicle.spawn_actor()
         self.ego_vehicle.get_actor().set_autopilot()
-        self.trafficmanager.ignore_lights_percentage(self.ego_vehicle.get_actor(),100)
-        self.trafficmanager.ignore_signs_percentage(self.ego_vehicle.get_actor(),100)
-        self.trafficmanager.ignore_vehicles_percentage(self.ego_vehicle.get_actor(),100)
-        self.trafficmanager.distance_to_leading_vehicle(self.ego_vehicle.get_actor(),0)
+        self.trafficmanager.ignore_lights_percentage(self.ego_vehicle.get_actor(),10)
+        self.trafficmanager.ignore_signs_percentage(self.ego_vehicle.get_actor(),10)
+        self.trafficmanager.ignore_vehicles_percentage(self.ego_vehicle.get_actor(),10)
+        self.trafficmanager.distance_to_leading_vehicle(self.ego_vehicle.get_actor(),5.0)
         self.trafficmanager.vehicle_percentage_speed_difference(self.ego_vehicle.get_actor(),-20)
         self.trafficmanager.auto_lane_change(self.ego_vehicle.get_actor(), True)
 
@@ -72,7 +73,7 @@ class Client:
         vehicles_batch = [SpawnActor(vehicle.blueprint,vehicle.transform)
                             .then(SetAutopilot(FutureActor, True, self.trafficmanager.get_port())) 
                             for vehicle in self.vehicles]
-
+        print("Spawn Vehicles")
         for i,response in enumerate(self.client.apply_batch_sync(vehicles_batch)):
             if not response.error:
                 self.vehicles[i].set_actor(response.actor_id)
@@ -82,7 +83,7 @@ class Client:
 
         for vehicle in self.vehicles:
             self.trafficmanager.set_path(vehicle.get_actor(),vehicle.path)
-
+        print("Spawn Walkers")
         self.walkers = [Walker(world=self.world,**walker_config) for walker_config in scene_config["walkers"]]
         walkers_batch = [SpawnActor(walker.blueprint,walker.transform) for walker in self.walkers]
         for i,response in enumerate(self.client.apply_batch_sync(walkers_batch)):
@@ -103,6 +104,14 @@ class Client:
         for walker in self.walkers:
             walker.start()
 
+        
+        ## Wait for a few simulation steps until the vehicles have stopped falling down
+        print("Wait for Actors to settle")
+        for i in range(0,70):
+            self.world.tick()
+            time.sleep(0.05)
+
+        print("Spawn Sensors")
         self.sensors = [Sensor(world=self.world, attach_to=self.ego_vehicle.get_actor(), **sensor_config) for sensor_config in scene_config["calibrated_sensors"]["sensors"]]
         sensors_batch = [SpawnActor(sensor.blueprint,sensor.transform,sensor.attach_to) for sensor in self.sensors]
         for i,response in enumerate(self.client.apply_batch_sync(sensors_batch)):
@@ -136,13 +145,13 @@ class Client:
         self.ego_vehicle.blueprint.set_attribute('role_name', 'hero')
         self.ego_vehicle.spawn_actor()
         self.ego_vehicle.get_actor().set_autopilot()
-        self.trafficmanager.ignore_lights_percentage(self.ego_vehicle.get_actor(),100)
-        self.trafficmanager.ignore_signs_percentage(self.ego_vehicle.get_actor(),100)
-        self.trafficmanager.ignore_vehicles_percentage(self.ego_vehicle.get_actor(),100)
-        self.trafficmanager.distance_to_leading_vehicle(self.ego_vehicle.get_actor(),0)
+        self.trafficmanager.ignore_lights_percentage(self.ego_vehicle.get_actor(),10)
+        self.trafficmanager.ignore_signs_percentage(self.ego_vehicle.get_actor(),10)
+        self.trafficmanager.ignore_vehicles_percentage(self.ego_vehicle.get_actor(),10)
+        self.trafficmanager.distance_to_leading_vehicle(self.ego_vehicle.get_actor(),5.0)
         self.trafficmanager.vehicle_percentage_speed_difference(self.ego_vehicle.get_actor(),-20)
         self.trafficmanager.auto_lane_change(self.ego_vehicle.get_actor(), True)
-
+        print("Spawn Vehicles")
         vehicle_bp_list = self.world.get_blueprint_library().filter("vehicle")
         self.vehicles = []
         for spawn_point in spawn_points[1:random.randint(1,len(spawn_points))]:
@@ -181,7 +190,7 @@ class Client:
             else:
                 print(response.error)
         self.walkers = list(filter(lambda walker:walker.get_actor(),self.walkers))
-
+        print("Spawn Walkers")
         walker_controller_bp = self.world.get_blueprint_library().find('controller.ai.walker')
         walkers_controller_batch = [SpawnActor(walker_controller_bp,carla.Transform(),walker.get_actor()) for walker in self.walkers]
         for i,response in enumerate(self.client.apply_batch_sync(walkers_controller_batch)):
@@ -193,6 +202,13 @@ class Client:
         for walker in self.walkers:
             walker.start()
 
+        ## Wait for a few simulation steps until the vehicles have stopped falling down
+        print("Wait for Actors to settle")
+        for i in range(0,70):
+            self.world.tick()
+            time.sleep(0.05)
+
+        print("Spawn Sensors")
         self.sensors = [Sensor(world=self.world, attach_to=self.ego_vehicle.get_actor(), **sensor_config) for sensor_config in scene_config["calibrated_sensors"]["sensors"]]
         sensors_batch = [SpawnActor(sensor.blueprint,sensor.transform,sensor.attach_to) for sensor in self.sensors]
         for i,response in enumerate(self.client.apply_batch_sync(sensors_batch)):
@@ -260,26 +276,30 @@ class Client:
         id = hash((scene_token,instance.get_actor().id))
         return category_token,id
 
-    def get_sample_annotation(self,scene_token,instance):
+    def get_sample_annotation(self,scene_token,instance,visibility=-1,no_pts=1):
         instance_token = generate_token("instance",hash((scene_token,instance.get_actor().id)))
-        visibility_token = str(self.get_visibility(instance))
+        if visibility < 0:
+            visibility_token = str(self.get_visibility(instance))
+        else:
+            visibility_token = str(visibility)
         
         attribute_tokens = [generate_token("attribute",attribute) for attribute in self.get_attributes(instance)]
         rotation,translation = get_nuscenes_rt(instance.get_transform())
         size = [instance.get_size().y,instance.get_size().x,instance.get_size().z]#xyz to whl
         num_lidar_pts = 0
         num_radar_pts = 0
-        for sensor in self.sensors:
-            if sensor.bp_name == 'sensor.lidar.ray_cast':
-                num_lidar_pts += self.get_num_lidar_pts(instance,sensor.get_last_data(),sensor.get_transform())
-            elif sensor.bp_name == 'sensor.other.radar':
-                num_radar_pts += self.get_num_radar_pts(instance,sensor.get_last_data(),sensor.get_transform())
+        if no_pts>0:
+            for sensor in self.sensors:
+                if ((sensor.bp_name == 'sensor.lidar.ray_cast') or (sensor.bp_name == 'sensor.lidar.thi_lidar')):
+                    num_lidar_pts += self.get_num_lidar_pts(instance,sensor.get_last_data(),sensor.get_transform())
+                elif sensor.bp_name == 'sensor.other.radar':
+                    num_radar_pts += self.get_num_radar_pts(instance,sensor.get_last_data(),sensor.get_transform())
         return instance_token,visibility_token,attribute_tokens,translation,rotation,size,num_lidar_pts,num_radar_pts
 
     def get_visibility(self,instance):
         max_visible_point_count = 0
         for sensor in self.sensors:
-            if sensor.bp_name == 'sensor.lidar.ray_cast':
+            if ((sensor.bp_name == 'sensor.lidar.ray_cast') or (sensor.bp_name == 'sensor.lidar.thi_lidar')):
                 ego_position = sensor.get_transform().location
                 ego_position.z += self.ego_vehicle.get_size().z*0.5
                 instance_position = instance.get_transform().location
@@ -310,14 +330,17 @@ class Client:
 
     def get_attributes(self,instance):
         return self.attribute_dict[instance.bp_name]
+    
 
     def get_num_lidar_pts(self,instance,lidar_data,lidar_transform):
+        #print("Check No. of Lidar Points on Annotation")
         num_lidar_pts = 0
         if lidar_data is not None:
             for data in lidar_data[1]:
                 point = lidar_transform.transform(data.point)
                 if instance.get_actor().bounding_box.contains(point,instance.get_actor().get_transform()):
                     num_lidar_pts+=1
+        #print("Check No. of Lidar Points on Annotation - finished")
         return num_lidar_pts
 
     def get_num_radar_pts(self,instance,radar_data,radar_transform):
@@ -343,7 +366,7 @@ class Client:
             "wind_intensity":random.random()*100,
             "fog_density":clamp(random.gauss(0,30)),
             "fog_distance":random.random()*100,
-            "wetness":clamp(random.gauss(0,30)),
+            "wetness":clamp(random.gauss(0,1)),
             "fog_falloff":random.random()*5,
             "scattering_intensity":max(random.random()*2-1,0),
             "mie_scattering_scale":max(random.random()*2-1,0),

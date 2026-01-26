@@ -1,12 +1,14 @@
 from carla_nuscenes.generator import Generator
 import os
 import yaml
+import datetime
 from yamlinclude import YamlIncludeConstructor
 YamlIncludeConstructor.add_to_loader_class(loader_class=yaml.FullLoader)
-config_path = "./configs/config.yaml"
+config_path = "./configs/config3.yaml"
 with open(config_path,'r') as f:
     config = yaml.load(f.read(),Loader=yaml.FullLoader)
 runner = Generator(config)
+print(f"Start Capturing the dataset {datetime.datetime.now()}")
 if os.path.exists(config["dataset"]["root"]):
     runner.generate_dataset(True)
 else:

@@ -1,15 +1,22 @@
 import os
 from .utils import load,dump,generate_token
 import carla
-from .sensor import parse_lidar_data,parse_radar_data
+from .sensor import parse_lidar_data,parse_radar_data, parse_thi_lidar_data
 from copy import deepcopy
 
 def save_image(image,path):
+    #print("SaveImage")
     image.save_to_disk(path)
 
 def save_lidar_data(lidar_data,path):
     points = parse_lidar_data(lidar_data)
     points.tofile(path)
+
+def save_thi_lidar_data(lidar_data,path):
+    #print("SaveTHILidar")
+    points = parse_thi_lidar_data(lidar_data)
+    points.tofile(path)
+
 
 def save_radar_data(radar_data,path):
     points = parse_radar_data(radar_data)
@@ -22,6 +29,8 @@ def save_sensor_data(data,path):
         save_radar_data(data,path)
     elif isinstance(data,carla.LidarMeasurement):
         save_lidar_data(data,path)   
+    elif isinstance(data,carla.THILidarMeasurement):
+        save_thi_lidar_data(data,path)
 
 def mkdir(path):
     if not os.path.exists(path):

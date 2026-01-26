@@ -20,6 +20,19 @@ def parse_lidar_data(lidar_data):
         points.append(point)
     return np.array(points)
 
+def parse_thi_lidar_data(lidar_data):
+    #print("ParseTHILidar")
+    dtype= np.dtype([
+        ('x',np.float32),
+        ('y',np.float32),
+        ('z',np.float32),
+        ('reflectivity',np.float32),
+        ('intensity',np.float32),
+        ('object_tag',np.float32)])
+    pts = np.frombuffer(lidar_data.raw_data,dtype=dtype)
+    points = np.vstack([pts['x'],pts['y'],pts['z'],pts['reflectivity'],pts['intensity']]).T
+    return points
+
 def parse_radar_data(radar_data):
     points = np.frombuffer(radar_data.raw_data, dtype=np.dtype('f4')).copy()
     return points
@@ -31,6 +44,8 @@ def parse_data(data):
         return parse_radar_data(data)
     elif isinstance(data,carla.LidarMeasurement):
         return parse_lidar_data(data)
+    elif isinstance(data, carla.THILidarMeasurement):
+        return parse_thi_lidar_data(data)
 
 def get_data_shape(data):
     if isinstance(data,carla.Image):
