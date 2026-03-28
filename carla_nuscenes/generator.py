@@ -2,11 +2,13 @@ from .client import Client
 from .dataset import Dataset
 import traceback
 import datetime
+import numpy as np
 
 class Generator:
     def __init__(self,config):
         self.config = config
         self.collect_client = Client(self.config["client"])
+        self.max_fov = config['max_fov']
 
     def generate_dataset(self,load=False):
         self.dataset = Dataset(**self.config["dataset"],load=load)
@@ -84,7 +86,12 @@ class Generator:
                     num_annos = 0
                     for instance in self.collect_client.walkers+self.collect_client.vehicles:
                         dist = instance.get_actor().get_location().distance(ego_vehicle.get_location())
-                        if dist < 60.0:
+                        # Check https://carla.readthedocs.io/en/latest/tuto_G_bounding_boxes/
+                        forward_vec = ego_vehicle.get_transform().get_forward_vector()
+                        ray_ego_target = instance.get_actor().get_transform().location - ego_vehicle.get_transform().location
+                        angle = np.rad2deg(forward_vec.get_vector_angle(ray_ego_target)) # Angle in Radians converted to degrees 
+                        print(f"Angle: {angle}, Dist: {dist}, of {instance.get_actor().get_transform().location} with respecto to {ego_vehicle.get_transform().location}")
+                        if dist < 60.0 and abs(angle) < self.max_fov: # NuScenes only uses object within 54 m distance, we furthermore filter to be within a parameterizable FOV
                             print(f"Generate Annos: {num_annos} of {len(self.collect_client.walkers+self.collect_client.vehicles)} for Instance within dist")
                             t1 = datetime.datetime.now()
                             vis = self.collect_client.get_visibility(instance)

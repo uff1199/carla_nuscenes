@@ -23,6 +23,7 @@ class Client:
         self.vehicles = None
         self.walkers = None
 
+        # Here the assignments of blueprint ids to categories happens
         get_category = lambda bp: "vehicle.car" if bp.id.split(".")[0] == "vehicle" else "human.pedestrian.adult" if bp.id.split(".")[0] == "walker" else None
         self.category_dict = {bp.id: get_category(bp) for bp in self.world.get_blueprint_library()}
         get_attribute = lambda bp: ["vehicle.moving"] if bp.id.split(".")[0] == "vehicle" else ["pedestrian.moving"] if bp.id.split(".")[0] == "walker" else None
@@ -284,6 +285,7 @@ class Client:
             visibility_token = str(visibility)
         
         attribute_tokens = [generate_token("attribute",attribute) for attribute in self.get_attributes(instance)]
+        # get_nuscenes_rt transfroms from left hand to right hand coordinate system
         rotation,translation = get_nuscenes_rt(instance.get_transform())
         size = [instance.get_size().y,instance.get_size().x,instance.get_size().z]#xyz to whl
         num_lidar_pts = 0
