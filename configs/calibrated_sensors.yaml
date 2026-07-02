@@ -198,26 +198,25 @@ sensors:
   #-----------lidar----------
   - 
     name: 'LIDAR_TOP'
-    bp_name: 'sensor.lidar.thi_lidar'
+    bp_name: 'sensor.lidar.ray_cast'
     location: 
       x: 0
       y: 0
-      z: 1.383
+      z: 2
     rotation:
-      yaw: 0
+      yaw: 90
       pitch: 0
       roll: 0
     options: 
-      'lidar_vertical_fov': '25'
-      'lidar_horizontal_fov': '115'
-      'horizontal_resolution': '0.2'
-      'max_range': '50'
-      'sensor_tick': '0.1'
-      'rain_intensity': '0.0'
-      'snow_intensity': '0.0'
-      'fog_distance': '0.0'
-      'threshold_minus_five': '0.00005'
-      'lines': '256'
+      'channels': '32'
+      'points_per_second': '1400000'
+      'range': '80'
+      'upper_fov': '10'
+      'lower_fov': '-30'
+      'horizontal_fov': '360'
+      'sensor_tick': '0.05'
+      'rotation_frequency': '100'
+
 
   #-----------gnss----------
   - 

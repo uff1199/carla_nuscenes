@@ -9,16 +9,24 @@ def parse_image(image):
     return array
 
 def parse_lidar_data(lidar_data):
-    points = []
-    current_channel = 0
-    end_idx = lidar_data.get_point_count(current_channel)
-    for idx,data in enumerate(lidar_data):
-        point = [data.point.x,data.point.y,data.point.z,data.intensity,current_channel]
-        if idx==end_idx:
-            current_channel+=1
-            end_idx+=lidar_data.get_point_count(current_channel)
-        points.append(point)
-    return np.array(points)
+
+    data_array = np.copy(np.frombuffer(lidar_data.raw_data, dtype=np.dtype('f4')))
+    data_array = np.reshape(data_array, (int(data_array.shape[0] / 4), 4))
+
+    channels = []
+
+    for ch in range(lidar_data.channels):
+        channels.extend(
+            [ch] * lidar_data.get_point_count(ch)
+        )
+
+    channels = np.asarray(channels, dtype=np.float32)[:, None]
+    #print(f"Parse Lidar Shape: {data_array.shape}, Channel Shape: {channels.shape}, {data_array[10:20]}, channels: {channels[10:20]}")
+    #final_data = np.column_stack([data_array, points_channel],dtype=np.float32)
+    final_data = np.hstack((data_array, channels))
+    final_data[:,1] = -1 * final_data[:,1] # LH to RH coordinate system
+    #return data_array
+    return final_data
 
 def parse_thi_lidar_data(lidar_data):
     #print("ParseTHILidar")
@@ -29,8 +37,8 @@ def parse_thi_lidar_data(lidar_data):
         ('reflectivity',np.float32),
         ('intensity',np.float32),
         ('object_tag',np.float32)])
-    pts = np.frombuffer(lidar_data.raw_data,dtype=dtype)
-    points = np.vstack([pts['x'],pts['y'],pts['z'],pts['reflectivity'],pts['intensity']]).T
+    pts = np.copy(np.frombuffer(lidar_data.raw_data,dtype=dtype))
+    points = np.vstack([pts['x'],-pts['y'],pts['z'],pts['reflectivity'],pts['intensity']]).T
     return points
 
 def parse_radar_data(radar_data):

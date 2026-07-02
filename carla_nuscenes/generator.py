@@ -90,7 +90,7 @@ class Generator:
                         forward_vec = ego_vehicle.get_transform().get_forward_vector()
                         ray_ego_target = instance.get_actor().get_transform().location - ego_vehicle.get_transform().location
                         angle = np.rad2deg(forward_vec.get_vector_angle(ray_ego_target)) # Angle in Radians converted to degrees 
-                        print(f"Angle: {angle}, Dist: {dist}, of {instance.get_actor().get_transform().location} with respecto to {ego_vehicle.get_transform().location}")
+                        #print(f"Angle: {angle}, Dist: {dist}, of {instance.get_actor().get_transform().location} with respecto to {ego_vehicle.get_transform().location}")
                         if dist < 60.0 and abs(angle) < self.max_fov: # NuScenes only uses object within 54 m distance, we furthermore filter to be within a parameterizable FOV
                             print(f"Generate Annos: {num_annos} of {len(self.collect_client.walkers+self.collect_client.vehicles)} for Instance within dist")
                             t1 = datetime.datetime.now()

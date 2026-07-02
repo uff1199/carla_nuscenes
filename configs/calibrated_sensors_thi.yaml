@@ -1,0 +1,346 @@
+CameraRGBBaseOptions: &CameraRGBBaseOptions
+  "image_size_x": "1600"
+  "image_size_y": "900"
+  #"sensor_tick": "0.083333"
+  "sensor_tick": "0.05"
+  "fstop": "1.4"
+  "shutter_speed": "200"
+  "bloom_intensity": "0.675"
+  "iso": "79"
+  "gamma": "2.2"
+  "lens_flare_intensity": "0.1"
+  "min_fstop": "1.2"
+  "blade_count": "5.0"
+  "exposure_mode": "histogram"
+  "exposure_min_bright": "10.0"
+  "exposure_max_bright": "12.0"
+  "exposure_speed_up": "3.0"
+  "exposure_speed_up": "1.0"
+  "calibration_constant": "16.0"
+  "focal_distance": "1000.0"
+  "blur_amount": "1.0"
+  "blur_radius": "0.0"
+  "motion_blur_intensity": "0.45"
+  "motion_blur_max_distortion": "0.35"
+  "motion_blur_min_object_screen_size": "0.1"
+  "slope": "0.79"
+  "toe": "0.35"
+  "shoulder": "0.26"
+  "black_clip": "0.00047"
+  "white_clip": "0.33"
+  "temp": "6000"
+  "tint": "-0.058"
+  "chromatic_aberration_intensity": "0.24"
+  "chromatic_aberration_offset" : "0.11"
+  "enable_postprocess_effects" : "True"
+
+
+RadarBaseOptions: &RadarBaseOptions
+  'horizontal_fov': '80'
+  'vertical_fov': '30'
+  'points_per_second': '1500'
+  'range': '250'
+  'sensor_tick': '0.076923'
+
+sensors:
+  #-----------camera----------
+  - 
+    name: "CAM_FRONT"
+    bp_name: 'sensor.camera.rgb'
+    location: 
+      x: 0.156
+      y: -0.016 
+      z: 1.094
+    rotation:
+      yaw: 0
+      pitch: 0
+      roll: 0
+    options: 
+        <<: *CameraRGBBaseOptions
+        "fov": "70"
+  # - 
+  #   name: "CAM_FRONT_RIGHT"
+  #   bp_name: 'sensor.camera.rgb'
+  #   location: 
+  #     x: 1.5
+  #     y: 0.7
+  #     z: 2
+  #   rotation:
+  #     yaw: 55
+  #     pitch: 0
+  #     roll: 0
+  #   options: 
+  #       <<: *CameraRGBBaseOptions
+  #       "fov": "70"
+  # - 
+  #   name: "CAM_FRONT_LEFT"
+  #   bp_name: 'sensor.camera.rgb'
+  #   location: 
+  #     x: 1.5
+  #     y: -0.7
+  #     z: 2
+  #   rotation:
+  #     yaw: -55
+  #     pitch: 0
+  #     roll: 0
+  #   options: 
+  #       <<: *CameraRGBBaseOptions
+  #       "fov": "70"
+  # - 
+  #   name: "CAM_BACK_LEFT"
+  #   bp_name: 'sensor.camera.rgb'
+  #   location: 
+  #     x: -0.7
+  #     y: 0
+  #     z: 2
+  #   rotation:
+  #     yaw: -110
+  #     pitch: 0
+  #     roll: 0
+  #   options: 
+  #       <<: *CameraRGBBaseOptions
+  #       "fov": "70"
+  # - 
+  #   name: "CAM_BACK"
+  #   bp_name: 'sensor.camera.rgb'
+  #   location: 
+  #     x: -1.5
+  #     y: 0
+  #     z: 2
+  #   rotation:
+  #     yaw: 180
+  #     pitch: 0
+  #     roll: 0
+  #   options: 
+  #       <<: *CameraRGBBaseOptions
+  #       "fov": "110"
+  # - 
+  #   name: "CAM_BACK_RIGHT"
+  #   bp_name: 'sensor.camera.rgb'
+  #   location: 
+  #     x: -0.7
+  #     y: 0
+  #     z: 2
+  #   rotation:
+  #     yaw: 110
+  #     pitch: 0
+  #     roll: 0
+  #   options: 
+  #       <<: *CameraRGBBaseOptions
+  #       "fov": "70"
+  # #-----------radar----------
+  # - 
+  #   name: "RADAR_FRONT"
+  #   bp_name: 'sensor.other.radar'
+  #   location: 
+  #     x: 1.5
+  #     y: 0
+  #     z: 0.5
+  #   rotation:
+  #     yaw: 0
+  #     pitch: 0
+  #     roll: 0
+  #   options: 
+  #       <<: *RadarBaseOptions
+  # - 
+  #   name: "RADAR_FRONT_RIGHT"
+  #   bp_name: 'sensor.other.radar'
+  #   location: 
+  #     x: 1.5
+  #     y: 0.7
+  #     z: 0.5
+  #   rotation:
+  #     yaw: 90
+  #     pitch: 0
+  #     roll: 0
+  #   options: 
+  #       <<: *RadarBaseOptions
+
+  # - 
+  #   name: "RADAR_FRONT_LEFT"
+  #   bp_name: 'sensor.other.radar'
+  #   location: 
+  #     x: 1.5
+  #     y: -0.7
+  #     z: 0.5
+  #   rotation:
+  #     yaw: -90
+  #     pitch: 0
+  #     roll: 0
+  #   options: 
+  #       <<: *RadarBaseOptions
+  # - 
+  #   name: "RADAR_BACK_RIGHT"
+  #   bp_name: 'sensor.other.radar'
+  #   location: 
+  #     x: -1.5
+  #     y: 0.7
+  #     z: 0.5
+  #   rotation:
+  #     yaw: 180
+  #     pitch: 0
+  #     roll: 0
+  #   options: 
+  #       <<: *RadarBaseOptions
+  # - 
+  #   name: "RADAR_BACK_LEFT"
+  #   bp_name: 'sensor.other.radar'
+  #   location: 
+  #     x: -1.5
+  #     y: -0.7
+  #     z: 0.5
+  #   rotation:
+  #     yaw: 180
+  #     pitch: 0
+  #     roll: 0
+  #   options: 
+  #       <<: *RadarBaseOptions
+
+  #-----------lidar----------
+  - 
+    name: 'LIDAR_TOP'
+    bp_name: 'sensor.lidar.thi_lidar'
+    location: 
+      x: 0
+      y: 0
+      z: 1.383
+    rotation:
+      yaw: 0
+      pitch: 0
+      roll: 0
+    options: 
+      'lidar_vertical_fov': '0'
+      'lidar_horizontal_fov': '118'
+      'update_rate': '10'
+      'horizontal_resolution': '0.1'
+      'max_range': '100'
+      'sensor_tick': '0.1'
+      'rain_intensity': '0.0'
+      'snow_intensity': '0.0'
+      'fog_distance': '0.0'
+      'threshold_minus_five': '0.00005'
+      'tone_map_offset': '0.3183098861837907' 
+      'lines': '55'
+      'intensity_mode': '2' # Atmospheric Attenuation + Reflectivity
+      'reflectivity_mode': '0'
+
+  - 
+    name: 'LIDAR_TOP_DEFAULT_INTENSITY'
+    bp_name: 'sensor.lidar.thi_lidar'
+    location: 
+      x: 0
+      y: 0
+      z: 1.383
+    rotation:
+      yaw: 0
+      pitch: 0
+      roll: 0
+    options: 
+      'lidar_vertical_fov': '0'
+      'lidar_horizontal_fov': '118'
+      'update_rate': '10'
+      'horizontal_resolution': '0.1'
+      'max_range': '100'
+      'sensor_tick': '0.1'
+      'rain_intensity': '0.0'
+      'snow_intensity': '0.0'
+      'fog_distance': '0.0'
+      'threshold_minus_five': '0.00005'
+      'tone_map_offset': '0.3183098861837907' 
+      'lines': '55'
+      'intensity_mode': '1' # Atmospheric Attenuation
+      'reflectivity_mode': '0'
+
+  - 
+    name: 'LIDAR_TOP_VOXELSCAPE'
+    bp_name: 'sensor.lidar.thi_lidar'
+    location: 
+      x: 0
+      y: 0
+      z: 1.383
+    rotation:
+      yaw: 0
+      pitch: 0
+      roll: 0
+    options: 
+      'lidar_vertical_fov': '0'
+      'lidar_horizontal_fov': '118'
+      'update_rate': '10'
+      'horizontal_resolution': '0.1'
+      'max_range': '100'
+      'sensor_tick': '0.1'
+      'rain_intensity': '0.0'
+      'snow_intensity': '0.0'
+      'fog_distance': '0.0'
+      'threshold_minus_five': '0.00005'
+      'tone_map_offset': '0.3183098861837907' 
+      'lines': '55'
+      'intensity_mode': '1' # Atmospheric Attenuation
+      'reflectivity_mode': '1'
+
+
+#-----------lidar Default----------
+  - 
+    name: 'LIDAR_TOP_DEFAULT'
+    bp_name: 'sensor.lidar.ray_cast'
+    location: 
+      x: 0
+      y: 0
+      z: 1.539
+    rotation:
+      yaw: 0
+      pitch: 0
+      roll: 0
+    options: 
+      'channels': '75'
+      'points_per_second': '4312500' # str((115*75)/(0.2*delta)) delta = 0.01
+      'range': '100'
+      'upper_fov': '15'
+      'lower_fov': '-15'
+      'horizontal_fov': '118'
+      'sensor_tick': '0.1'
+      'rotation_frequency': '100'
+      'noise_stddev': '0.0'
+      'dropoff_general_rate': '0.0'
+
+
+  #-----------gnss----------
+  - 
+    name: "GNSS"
+    bp_name: 'sensor.other.gnss'
+    location: 
+      x: 0
+      y: 0
+      z: 0
+    rotation:
+      yaw: 0
+      pitch: 0
+      roll: 0
+    options: ~
+  #-----------imu----------
+  - 
+    name: "IMU"
+    bp_name: 'sensor.other.imu'
+    location: 
+      x: -0.7
+      y: 0
+      z: 0
+    rotation:
+      yaw: 0
+      pitch: 0
+      roll: 0
+    options: ~
+  # -
+  #   name: "viz"
+  #   bp_name: 'sensor.camera.rgb'
+  #   location: 
+  #     x: 0
+  #     y: 0
+  #     z: 2
+  #   rotation:
+  #     yaw: 0
+  #     pitch: 0
+  #     roll: 0
+  #   options: 
+  #       <<: *CameraRGBBaseOptions
+  #       "fov": "70"

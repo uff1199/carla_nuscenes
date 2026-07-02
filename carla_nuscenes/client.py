@@ -7,6 +7,111 @@ from .utils import generate_token,get_nuscenes_rt,get_intrinsic,transform_timest
 import random
 import time
 
+
+'''
+        NuScenes
+        NameMapping = {
+        'movable_object.barrier': 'barrier',
+        'vehicle.bicycle': 'bicycle',
+        'vehicle.bus.bendy': 'bus',
+        'vehicle.bus.rigid': 'bus',
+        'vehicle.car': 'car',
+        'vehicle.construction': 'construction_vehicle',
+        'vehicle.motorcycle': 'motorcycle',
+        'human.pedestrian.adult': 'pedestrian',
+        'human.pedestrian.child': 'pedestrian',
+        'human.pedestrian.construction_worker': 'pedestrian',
+        'human.pedestrian.police_officer': 'pedestrian',
+        'movable_object.trafficcone': 'traffic_cone',
+        'vehicle.trailer': 'trailer',
+        'vehicle.truck': 'truck'
+        }
+        DefaultAttribute = {
+        'car': 'vehicle.parked',
+        'pedestrian': 'pedestrian.moving',
+        'trailer': 'vehicle.parked',
+        'truck': 'vehicle.parked',
+        'bus': 'vehicle.moving',
+        'motorcycle': 'cycle.without_rider',
+        'construction_vehicle': 'vehicle.parked',
+        'bicycle': 'cycle.without_rider',
+        'barrier': '',
+        'traffic_cone': '',
+        }
+        Current CARLA Blueprints
+        see actor_list.txt
+'''
+
+def get_category(bp):
+    # Helper to check if a keyword is in the blueprint ID
+    bp_id = bp.id
+    
+    # 1. Check for specific vehicle types
+    if 'vehicle' in bp_id:
+        # Bicycles
+        if 'diamondback' in bp_id or 'gazelle' in bp_id:
+            return 'vehicle.bicycle'
+        
+        # Motorcycles
+        if 'kawasaki' in bp_id or 'yamaha' in bp_id or 'harley' in bp_id or 'vespa' in bp_id:
+            return 'vehicle.motorcycle'
+        
+        # Trucks
+        if 'firetruck' in bp_id or 'ambulance' in bp_id or 'carlacola' in bp_id:
+            return 'vehicle.truck'
+        
+        # Buses
+        if 'sprinter' in bp_id or 't2' in bp_id or 'fusorosa' in bp_id:
+            return 'vehicle.bus.rigid'
+        
+        # Construction Vehicles
+        if 'charger_police' in bp_id:
+            return 'vehicle.construction' # Treating police car as construction for this mapping or specific logic
+        
+        # Default to car for other vehicles
+        return 'vehicle.car'
+
+    # 2. Check for pedestrians
+    elif 'walker' in bp_id:
+        return 'human.pedestrian.adult'
+
+    # 3. Check for static props (Barriers and Cones)
+    elif 'static' in bp_id:
+        if 'trafficcone' in bp_id or 'constructioncone' in bp_id:
+            return 'movable_object.trafficcone'
+        if 'streetbarrier' in bp_id:
+            return 'movable_object.barrier'
+        
+    return None
+
+def get_attribute(bp):
+    category = get_category(bp)
+    
+    if category is None:
+        return None
+
+    # Map NuScenes categories to default attributes
+    if category == 'vehicle.car':
+        return ['vehicle.parked']
+    elif category == 'vehicle.truck':
+        return ['vehicle.parked']
+    elif category == 'vehicle.bus.bendy':
+        return ['vehicle.moving']
+    elif category == 'vehicle.motorcycle':
+        return ['cycle.without_rider']
+    elif category == 'vehicle.bicycle':
+        return ['cycle.without_rider']
+    elif category == 'human.pedestrian.adult':
+        return ['pedestrian.moving']
+    elif category == 'movable_object.trafficcone':
+        return ['']
+    elif category == 'movable_object.barrier':
+        return ['']
+    
+    # Fallback for other mapped categories (e.g. construction)
+    return ['vehicle.parked']
+
+
 class Client:
     def __init__(self,client_config):
         self.client = carla.Client(client_config["host"],client_config["port"])
@@ -23,10 +128,11 @@ class Client:
         self.vehicles = None
         self.walkers = None
 
+
         # Here the assignments of blueprint ids to categories happens
-        get_category = lambda bp: "vehicle.car" if bp.id.split(".")[0] == "vehicle" else "human.pedestrian.adult" if bp.id.split(".")[0] == "walker" else None
+        #get_category = lambda bp: "vehicle.car" if bp.id.split(".")[0] == "vehicle" else "human.pedestrian.adult" if bp.id.split(".")[0] == "walker" else None
         self.category_dict = {bp.id: get_category(bp) for bp in self.world.get_blueprint_library()}
-        get_attribute = lambda bp: ["vehicle.moving"] if bp.id.split(".")[0] == "vehicle" else ["pedestrian.moving"] if bp.id.split(".")[0] == "walker" else None
+        #get_attribute = lambda bp: ["vehicle.moving"] if bp.id.split(".")[0] == "vehicle" else ["pedestrian.moving"] if bp.id.split(".")[0] == "walker" else None
         self.attribute_dict = {bp.id: get_attribute(bp) for bp in self.world.get_blueprint_library()}
 
         self.trafficmanager = self.client.get_trafficmanager()
@@ -171,7 +277,9 @@ class Client:
                 print(response.error)
         self.vehicles = list(filter(lambda vehicle:vehicle.get_actor(),self.vehicles))
 
-        walker_bp_list = self.world.get_blueprint_library().filter("pedestrian")
+        # Disable spawining of dummy target + ISO target by filtering out
+        walker_bp_list = self.world.get_blueprint_library().filter("*.pedestrian.[0-9][0-9][0-5][0-2]")
+        print(f"Found: {len(walker_bp_list)} walkers")      
         self.walkers = []
         for i in range(random.randint(len(spawn_points),len(spawn_points)*2)):
             spawn = self.world.get_random_location_from_navigation()
@@ -361,19 +469,19 @@ class Client:
     def get_random_weather(self):
         weather_param = {
             "cloudiness":clamp(random.gauss(0,30)),
-            "sun_azimuth_angle":random.random()*360,
-            "sun_altitude_angle":random.random()*120-30,
-            "precipitation":clamp(random.gauss(0,30)),
-            "precipitation_deposits":clamp(random.gauss(0,30)),
+            #"sun_azimuth_angle":random.random()*360,
+            #"sun_altitude_angle":random.random()*120-30,
+            #"precipitation":clamp(random.gauss(0,30)),
+            #"precipitation_deposits":clamp(random.gauss(0,30)),
             "wind_intensity":random.random()*100,
-            "fog_density":clamp(random.gauss(0,30)),
-            "fog_distance":random.random()*100,
-            "wetness":clamp(random.gauss(0,1)),
-            "fog_falloff":random.random()*5,
+            #"fog_density":clamp(random.gauss(0,30)),
+            #"fog_distance":random.random()*100,
+            #"wetness":clamp(random.gauss(0,1)),
+            #"fog_falloff":random.random()*5,
             "scattering_intensity":max(random.random()*2-1,0),
             "mie_scattering_scale":max(random.random()*2-1,0),
             "rayleigh_scattering_scale":max(random.random()*2-1,0),
-            "dust_storm":clamp(random.gauss(0,30))
+            #"dust_storm":clamp(random.gauss(0,30))
         }
         return weather_param
 
