@@ -39,7 +39,7 @@ def parse_thi_lidar_data(lidar_data):
         ('object_tag',np.float32)])
     pts = np.copy(np.frombuffer(lidar_data.raw_data,dtype=dtype))
     points = np.vstack([pts['x'],-pts['y'],pts['z'],pts['reflectivity'],pts['intensity']]).T
-    return points
+    return points, pts['object_tag']
 
 def parse_radar_data(radar_data):
     points = np.frombuffer(radar_data.raw_data, dtype=np.dtype('f4')).copy()
@@ -62,6 +62,7 @@ def get_data_shape(data):
         return 0,0
 class Sensor(Actor):
     def __init__(self, name, **args):
+        #print(f"Spawn Sensor {name}: {args} ")
         super().__init__(**args)
         self.name = name
         self.data_list = []
@@ -85,6 +86,7 @@ class Sensor(Actor):
             
     def add_data(self,data):
         self.data_list.append((self.actor.parent.get_transform(),data))
+        # print(f"Add Data to {self.name} - Length: {len(self.data_list)} - timestamp: {data.timestamp*10e6}")
 
     def get_transform(self):
         return self.actor.get_transform()

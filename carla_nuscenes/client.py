@@ -116,6 +116,7 @@ class Client:
     def __init__(self,client_config):
         self.client = carla.Client(client_config["host"],client_config["port"])
         self.client.set_timeout(client_config["time_out"])
+        self.principal_lidar = 'LIDAR_TOP_SPINNING'
 
     def generate_world(self,world_config):
         print("generate world start!")
@@ -258,10 +259,16 @@ class Client:
         self.trafficmanager.distance_to_leading_vehicle(self.ego_vehicle.get_actor(),5.0)
         self.trafficmanager.vehicle_percentage_speed_difference(self.ego_vehicle.get_actor(),-20)
         self.trafficmanager.auto_lane_change(self.ego_vehicle.get_actor(), True)
+
+        if 'distance' in scene_config:
+            nearby_spawn_points = [sp for sp in spawn_points if sp.location.distance(self.ego_vehicle.get_actor().get_transform().location) < scene_config['distance']]
+        else:
+            nearby_spawn_points = spawn_points
         print("Spawn Vehicles")
         vehicle_bp_list = self.world.get_blueprint_library().filter("vehicle")
+        vehicle_bp_list = [bp for bp in vehicle_bp_list if bp.id != "vehicle..ballooncar"]
         self.vehicles = []
-        for spawn_point in spawn_points[1:random.randint(1,len(spawn_points))]:
+        for spawn_point in nearby_spawn_points[1:random.randint(1,len(nearby_spawn_points))]:
             location = {attr:getattr(spawn_point.location,attr) for attr in ["x","y","z"]}
             rotation = {attr:getattr(spawn_point.rotation,attr) for attr in ["yaw","pitch","roll"]}
             bp_name = random.choice(vehicle_bp_list).id
@@ -281,7 +288,7 @@ class Client:
         walker_bp_list = self.world.get_blueprint_library().filter("*.pedestrian.[0-9][0-9][0-5][0-2]")
         print(f"Found: {len(walker_bp_list)} walkers")      
         self.walkers = []
-        for i in range(random.randint(len(spawn_points),len(spawn_points)*2)):
+        for i in range(random.randint(len(nearby_spawn_points),len(nearby_spawn_points)*4)):
             spawn = self.world.get_random_location_from_navigation()
             if spawn != None:
                 bp_name=random.choice(walker_bp_list).id
@@ -409,7 +416,7 @@ class Client:
     def get_visibility(self,instance):
         max_visible_point_count = 0
         for sensor in self.sensors:
-            if ((sensor.bp_name == 'sensor.lidar.ray_cast') or (sensor.bp_name == 'sensor.lidar.thi_lidar')):
+            if (sensor.name == self.principal_lidar):
                 ego_position = sensor.get_transform().location
                 ego_position.z += self.ego_vehicle.get_size().z*0.5
                 instance_position = instance.get_transform().location
@@ -469,8 +476,8 @@ class Client:
     def get_random_weather(self):
         weather_param = {
             "cloudiness":clamp(random.gauss(0,30)),
-            #"sun_azimuth_angle":random.random()*360,
-            #"sun_altitude_angle":random.random()*120-30,
+            "sun_azimuth_angle":random.random()*360,
+            "sun_altitude_angle":random.random()*60+30,
             #"precipitation":clamp(random.gauss(0,30)),
             #"precipitation_deposits":clamp(random.gauss(0,30)),
             "wind_intensity":random.random()*100,

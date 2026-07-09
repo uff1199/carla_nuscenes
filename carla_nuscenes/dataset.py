@@ -14,8 +14,14 @@ def save_lidar_data(lidar_data,path):
 
 def save_thi_lidar_data(lidar_data,path):
     #print("SaveTHILidar")
-    points = parse_thi_lidar_data(lidar_data)
+    points, object_tag = parse_thi_lidar_data(lidar_data)
     points.tofile(path)
+    split_path = path.split('/')
+    root = '/'.join(split_path[:-1])
+
+    # Do not save semantic labels for sweeps
+    if not 'sweeps' in path:
+        object_tag.tofile(root + '/annotation_' + split_path[-1][:-7] + 'bin')
 
 
 def save_radar_data(radar_data,path):
@@ -74,6 +80,7 @@ class Dataset:
 
     def load(self):
         for key in self.data:
+            #print(f"Load Key: {key}")
             json_path = os.path.join(self.json_dir,key+".json")
             self.data[key] = load(json_path)
 

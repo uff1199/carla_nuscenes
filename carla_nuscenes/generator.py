@@ -4,11 +4,14 @@ import traceback
 import datetime
 import numpy as np
 
+
 class Generator:
     def __init__(self,config):
         self.config = config
         self.collect_client = Client(self.config["client"])
         self.max_fov = config['max_fov']
+        self.max_dist = config['max_dist']
+        self.perception_sensors = ['sensor.camera.rgb','sensor.other.radar','sensor.lidar.ray_cast','sensor.lidar.thi_lidar', 'sensor.lidar.thi_rotational_lidar']
 
     def generate_dataset(self,load=False):
         self.dataset = Dataset(**self.config["dataset"],load=load)
@@ -65,23 +68,26 @@ class Generator:
                 samples_data_token[sensor.name] = ""
 
             sample_token = ""
-            for frame_count in range(int(scene_config["collect_time"]/self.collect_client.settings.fixed_delta_seconds)):
+            # print(f"Delta Sim: {self.collect_client.settings.fixed_delta_seconds}, Max. Frame: {int(scene_config['collect_time']/self.collect_client.settings.fixed_delta_seconds)}, Divider {int(scene_config['keyframe_time']/self.collect_client.settings.fixed_delta_seconds)}")
+            for frame_count in range(int(scene_config['collect_time']/self.collect_client.settings.fixed_delta_seconds)):
                 #print("frame count:",frame_count)
                 self.collect_client.tick()
+                # snapshot = self.collect_client.world.get_snapshot()
+                # print(f"World Tick: {snapshot.frame}, {snapshot.timestamp.elapsed_seconds}")
                 if (frame_count+1)%int(scene_config["keyframe_time"]/self.collect_client.settings.fixed_delta_seconds) == 0:
                     sample_token = self.dataset.update_sample(sample_token,scene_token,*self.collect_client.get_sample())
                     start_time = datetime.datetime.now()
                     for sensor in self.collect_client.sensors:
-                        print(f"{frame_count} Do for Sensor: {sensor.bp_name}")
-                        if sensor.bp_name in ['sensor.camera.rgb','sensor.other.radar','sensor.lidar.ray_cast','sensor.lidar.thi_lidar']:
+                        if sensor.bp_name in self.perception_sensors:
+                            #print(f"{frame_count} Do for Sensor: {sensor.bp_name}, #No. of Samples: {len(sensor.get_data_list())}")
                             for idx,sample_data in enumerate(sensor.get_data_list()):
                                 ego_pose_token = self.dataset.update_ego_pose(scene_token,calibrated_sensors_token[sensor.name],*self.collect_client.get_ego_pose(sample_data))
                                 is_key_frame = False
                                 if idx == len(sensor.get_data_list())-1:
                                     is_key_frame = True
                                 samples_data_token[sensor.name] = self.dataset.update_sample_data(samples_data_token[sensor.name],calibrated_sensors_token[sensor.name],sample_token,ego_pose_token,is_key_frame,*self.collect_client.get_sample_data(sample_data))
-                    print(f"{frame_count}: Saving the data took: {(datetime.datetime.now() - start_time).total_seconds()}")
-                    start_time = datetime.datetime.now()
+                    #print(f"{frame_count}: Saving the data took: {(datetime.datetime.now() - start_time).total_seconds()}")
+                    #start_time = datetime.datetime.now()
                     ego_vehicle = self.collect_client.ego_vehicle.get_actor()
                     num_annos = 0
                     for instance in self.collect_client.walkers+self.collect_client.vehicles:
@@ -91,22 +97,22 @@ class Generator:
                         ray_ego_target = instance.get_actor().get_transform().location - ego_vehicle.get_transform().location
                         angle = np.rad2deg(forward_vec.get_vector_angle(ray_ego_target)) # Angle in Radians converted to degrees 
                         #print(f"Angle: {angle}, Dist: {dist}, of {instance.get_actor().get_transform().location} with respecto to {ego_vehicle.get_transform().location}")
-                        if dist < 60.0 and abs(angle) < self.max_fov: # NuScenes only uses object within 54 m distance, we furthermore filter to be within a parameterizable FOV
-                            print(f"Generate Annos: {num_annos} of {len(self.collect_client.walkers+self.collect_client.vehicles)} for Instance within dist")
+                        if dist < self.max_dist and abs(angle) <= self.max_fov: # NuScenes only uses object within 54 m distance, we furthermore filter to be within a parameterizable FOV
+                            #print(f"Generate Annos: {num_annos} of {len(self.collect_client.walkers+self.collect_client.vehicles)} for Instance within dist")
                             t1 = datetime.datetime.now()
                             vis = self.collect_client.get_visibility(instance)
                             if vis > 0:
                                 sample_annos = self.collect_client.get_sample_annotation(scene_token,instance,vis,-1)
-                                print(f"{frame_count}: Getting CARLA annos took {(datetime.datetime.now()-t1).total_seconds()}")
+                                #print(f"{frame_count}: Getting CARLA annos took {(datetime.datetime.now()-t1).total_seconds()}")
                                 t1 = datetime.datetime.now()
                                 samples_annotation_token[instance.get_actor().id]  = self.dataset.update_sample_annotation(samples_annotation_token[instance.get_actor().id],sample_token,*sample_annos)
-                                print(f"{frame_count}: Update annos dicts took {(datetime.datetime.now()-t1).total_seconds()}")
+                                #print(f"{frame_count}: Update annos dicts took {(datetime.datetime.now()-t1).total_seconds()}")
                                 num_annos += 1
                     print(f"{frame_count}: Getting Sample Annotations took: {(datetime.datetime.now()-start_time).total_seconds()}")
-                    start_time = datetime.datetime.now()
+                    #start_time = datetime.datetime.now()
                     for sensor in self.collect_client.sensors:
                         sensor.get_data_list().clear()
-                    print(f"{frame_count}: Clearing Sensor data took: {(datetime.datetime.now()-start_time).total_seconds()}")
+                    #print(f"{frame_count}: Clearing Sensor data took: {(datetime.datetime.now()-start_time).total_seconds()}")
         except:
             traceback.print_exc()
         finally:
