@@ -72,6 +72,22 @@ class Dataset:
                         "current_scene_count":0
                         }
         }
+        self.index = {
+            "attribute":{},
+            "calibrated_sensor":{},
+            "category":{},
+            "ego_pose":{},
+            "instance":{},
+            "log":{},
+            "map":{},
+            "sample":{},
+            "sample_annotation":{},
+            "sample_data":{},
+            "scene":{},
+            "sensor":{},
+            "visibility":{},
+        }
+
         self.data_cache = {}
         if load:
             self.load()
@@ -83,6 +99,9 @@ class Dataset:
             #print(f"Load Key: {key}")
             json_path = os.path.join(self.json_dir,key+".json")
             self.data[key] = load(json_path)
+        for key in self.index:
+            for val in self.data[key]:
+                self.index[key][val['token']]=val
 
     def save(self):
         for key in self.data:
@@ -91,10 +110,25 @@ class Dataset:
             print(json_path)
 
     def get_item(self,key,token):
-        for item in self.data[key]:
-            if item["token"] == token:
-                return item
-        return None
+        return self.index[key].get(token)
+        # for item in self.data[key]:
+        #     if item["token"] == token:
+        #         return item
+        # return None
+
+    def insert_item(self,key,item):
+        self.data[key].append(item)
+        self.index[key][item['token']] = item
+
+    def replace_item(self,key,item):
+        self.data[key]
+
+    def update_database(self,key,item,replace):
+        existing = self.get_item(key,item["token"])
+        if existing is None:
+            self.insert_item(key,item)
+        elif replace:
+            existing.update(item)
 
     def update_map(self,name,category,replace=True):
         map_item = {}
@@ -102,11 +136,9 @@ class Dataset:
         map_item["token"] = generate_token("map",name)
         map_item["filename"] = os.path.join("maps",map_item["token"]+".png")
         map_item["log_tokens"] = []
-        if self.get_item("map",map_item["token"]) is None:
-            self.data["map"].append(map_item)
-        elif replace:
-            self.data["map"].remove(self.get_item("map",map_item["token"]))
-            self.data["map"].append(map_item)
+        
+        self.update_database('map',map_item,replace)
+
         return map_item["token"]
 
     def update_log(self,map_token,date,time,timezone,vehicle,location,replace=True):
@@ -118,11 +150,9 @@ class Dataset:
         log_item["location"] = location
         map_item = self.get_item("map",map_token)
         map_item["log_tokens"].append(log_item["token"])
-        if self.get_item("log",log_item["token"]) is None:
-            self.data["log"].append(log_item)
-        elif replace:
-            self.data["log"].remove(self.get_item("log",log_item["token"]))
-            self.data["log"].append(log_item)
+
+        self.update_database('log',log_item,replace)
+
         return log_item["token"]
 
     def update_sensor(self,channel,modality,replace=True):
@@ -130,11 +160,9 @@ class Dataset:
         sensor_item["token"] = generate_token("sensor",channel)
         sensor_item["channel"] = channel
         sensor_item["modality"] = modality
-        if self.get_item("sensor",sensor_item["token"]) is None:
-            self.data["sensor"].append(sensor_item)
-        elif replace:
-            self.data["sensor"].remove(self.get_item("sensor",sensor_item["token"]))
-            self.data["sensor"].append(sensor_item)
+
+        self.update_database('sensor',sensor_item,replace)
+
         mkdir(os.path.join(self.root,"samples",channel))
         mkdir(os.path.join(self.root,"sweeps",channel))
         return sensor_item["token"]
@@ -161,11 +189,8 @@ class Dataset:
         calibrated_sensor_item["translation"] = translation
         calibrated_sensor_item["rotation"] = rotation
         calibrated_sensor_item["camera_intrinsic"] = intrinsic
-        if self.get_item("calibrated_sensor",calibrated_sensor_item["token"]) is None:
-            self.data["calibrated_sensor"].append(calibrated_sensor_item)
-        elif replace:
-            self.data["calibrated_sensor"].remove(self.get_item("calibrated_sensor",calibrated_sensor_item["token"]))
-            self.data["calibrated_sensor"].append(calibrated_sensor_item)
+        self.update_database('calibrated_sensor',calibrated_sensor_item,replace)
+
         return calibrated_sensor_item["token"]
 
     def update_scene(self,log_token,description,replace=True):
@@ -177,11 +202,8 @@ class Dataset:
         scene_item["nbr_samples"] = 0
         scene_item["first_sample_token"] = ""
         scene_item["last_sample_token"] = ""
-        if self.get_item("scene",scene_item["token"]) is None:
-            self.data["scene"].append(scene_item)
-        elif replace:
-            self.data["scene"].remove(self.get_item("scene",scene_item["token"]))
-            self.data["scene"].append(scene_item)
+        self.update_database('scene',scene_item,replace)
+
         return scene_item["token"]
 
     def update_sample(self,prev,scene_token,timestamp,replace=True):
@@ -198,11 +220,9 @@ class Dataset:
             self.get_item("sample",prev)["next"] = sample_item["token"]
         scene_item["last_sample_token"] = sample_item["token"]
         scene_item["nbr_samples"] += 1
-        if self.get_item("sample",sample_item["token"]) is None:
-            self.data["sample"].append(sample_item)
-        elif replace:
-            self.data["sample"].remove(self.get_item("sample",sample_item["token"]))
-            self.data["sample"].append(sample_item)
+
+        self.update_database('sample',sample_item,replace)
+
         return sample_item["token"]
 
     def update_sample_data(self,prev,calibrated_sensor_token,sample_token,ego_pose_token,is_key_frame,sample_data,height,width,replace=True):
@@ -230,11 +250,9 @@ class Dataset:
         sample_data_item["filename"] = filename
         if prev != "":
             self.get_item("sample_data",prev)["next"] = ego_pose_token
-        if self.get_item("sample_data",sample_data_item["token"]) is None:
-            self.data["sample_data"].append(sample_data_item)
-        elif replace:
-            self.data["sample_data"].remove(self.get_item("sample_data",sample_data_item["token"]))
-            self.data["sample_data"].append(sample_data_item)
+
+        self.update_database('sample_data',sample_data_item,replace)
+
         return sample_data_item["token"]
 
     def update_ego_pose(self,scene_token,calibrated_sensor_token,timestamp,translation,rotation,replace=True):
@@ -243,11 +261,9 @@ class Dataset:
         ego_pose_item["timestamp"] = timestamp
         ego_pose_item["rotation"] = rotation
         ego_pose_item["translation"] = translation
-        if self.get_item("ego_pose",ego_pose_item["token"]) is None:
-            self.data["ego_pose"].append(ego_pose_item)
-        elif replace:
-            self.data["ego_pose"].remove(self.get_item("ego_pose",ego_pose_item["token"]))
-            self.data["ego_pose"].append(ego_pose_item)
+
+        self.update_database('ego_pose',ego_pose_item,replace)
+
         return ego_pose_item["token"]
 
     def update_visibility(self,description,level,replace=True):
@@ -255,11 +271,9 @@ class Dataset:
         visibility_item["token"] = str(len(self.data["visibility"]))
         visibility_item["description"] = description
         visibility_item["level"] = level
-        if self.get_item("visibility",visibility_item["token"]) is None:
-            self.data["visibility"].append(visibility_item)
-        elif replace:
-            self.data["visibility"].remove(self.get_item("visibility",visibility_item["token"]))
-            self.data["visibility"].append(visibility_item)
+
+        self.update_database('visibility',visibility_item,replace)
+
         return visibility_item["token"]
 
     def update_attribute(self,name,description,replace=True):
@@ -267,11 +281,9 @@ class Dataset:
         attribute_item["token"] = generate_token("attribute",name)
         attribute_item["name"] = name
         attribute_item["description"] = description
-        if self.get_item("attribute",attribute_item["token"]) is None:
-            self.data["attribute"].append(attribute_item)
-        elif replace:
-            self.data["attribute"].remove(self.get_item("attribute",attribute_item["token"]))
-            self.data["attribute"].append(attribute_item)
+
+        self.update_database('attribute',attribute_item,replace)
+
         return attribute_item["token"]
 
     def update_category(self,name,description,replace=True):
@@ -279,11 +291,9 @@ class Dataset:
         category_item["token"] = generate_token("category",name)
         category_item["name"] = name
         category_item["description"] = description
-        if self.get_item("category",category_item["token"]) is None:
-            self.data["category"].append(category_item)
-        elif replace:
-            self.data["category"].remove(self.get_item("category",category_item["token"]))
-            self.data["category"].append(category_item)
+
+        self.update_database('category',category_item,replace)
+
         return category_item["token"]
 
     def update_instance(self,category_token,id,replace=True):
@@ -293,11 +303,9 @@ class Dataset:
         instance_item["nbr_annotations"] = 0
         instance_item["first_annotation_token"] = ""
         instance_item["last_annotation_token"] = ""
-        if self.get_item("instance",instance_item["token"]) is None:
-            self.data["instance"].append(instance_item)
-        elif replace:
-            self.data["instance"].remove(self.get_item("instance",instance_item["token"]))
-            self.data["instance"].append(instance_item)
+
+        self.update_database('instance',instance_item,replace)
+
         return instance_item["token"]
 
     def update_sample_annotation(self,prev,sample_token,instance_token,visibility_token,
@@ -323,11 +331,8 @@ class Dataset:
             self.get_item("sample_annotation",prev)["next"] = sample_annotation_item["token"]
         instance_item["last_annotation_token"] = sample_annotation_item["token"]
         instance_item["nbr_annotations"] += 1
-        if self.get_item("sample_annotation",sample_annotation_item["token"]) is None:
-            self.data["sample_annotation"].append(sample_annotation_item)
-        elif replace:
-            self.data["sample_annotation"].remove(self.get_item("sample_annotation",sample_annotation_item["token"]))
-            self.data["sample_annotation"].append(sample_annotation_item)
+        self.update_database('sample_annotation',sample_annotation_item,replace)
+
         return sample_annotation_item["token"]
 
     def get_filename(self,sample_data_item):

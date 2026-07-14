@@ -6,6 +6,7 @@ import math
 from .utils import generate_token,get_nuscenes_rt,get_intrinsic,transform_timestamp,clamp
 import random
 import time
+from matplotlib import pyplot as plt
 
 
 '''
@@ -114,12 +115,19 @@ def get_attribute(bp):
 
 class Client:
     def __init__(self,client_config):
-        self.client = carla.Client(client_config["host"],client_config["port"])
-        self.client.set_timeout(client_config["time_out"])
+        self.client_port = client_config['port']
+        self.client_host = client_config['host']
+        self.client_timout = client_config['time_out']
+        
         self.principal_lidar = 'LIDAR_TOP_SPINNING'
+
+        self.debug=False
 
     def generate_world(self,world_config):
         print("generate world start!")
+        self.client = carla.Client(self.client_host,self.client_port)
+        self.client.set_timeout(self.client_timout)
+
         self.client.load_world_if_different(world_config["map_name"])
         self.world = self.client.get_world()
         self.original_settings = self.world.get_settings()
@@ -151,7 +159,16 @@ class Client:
         if scene_config["custom"]:
             self.generate_custom_scene(scene_config)
         else:
-            self.generate_random_scene(scene_config)
+            while True:
+                success = self.generate_random_scene(scene_config)
+                if success == True:
+                    break
+                else:
+                    try:
+                        self.destroy_scene()
+                    except RuntimeError as E:
+                        print(E)
+                        pass
         print("generate scene success!")
 
     def generate_custom_scene(self,scene_config):
@@ -185,8 +202,8 @@ class Client:
         for i,response in enumerate(self.client.apply_batch_sync(vehicles_batch)):
             if not response.error:
                 self.vehicles[i].set_actor(response.actor_id)
-            else:
-                print(response.error)
+            # else:
+            #     print(response.error)
         self.vehicles = list(filter(lambda vehicle:vehicle.get_actor(),self.vehicles))
 
         for vehicle in self.vehicles:
@@ -197,8 +214,8 @@ class Client:
         for i,response in enumerate(self.client.apply_batch_sync(walkers_batch)):
             if not response.error:
                 self.walkers[i].set_actor(response.actor_id)
-            else:
-                print(response.error)
+            # else:
+            #     print(response.error)
         self.walkers = list(filter(lambda walker:walker.get_actor(),self.walkers))
 
         walker_controller_bp = self.world.get_blueprint_library().find('controller.ai.walker')
@@ -206,8 +223,8 @@ class Client:
         for i,response in enumerate(self.client.apply_batch_sync(walkers_controller_batch)):
                     if not response.error:
                         self.walkers[i].set_controller(response.actor_id)
-                    else:
-                        print(response.error)
+                    # else:
+                    #     print(response.error)
         self.world.tick()
         for walker in self.walkers:
             walker.start()
@@ -215,9 +232,9 @@ class Client:
         
         ## Wait for a few simulation steps until the vehicles have stopped falling down
         print("Wait for Actors to settle")
-        for i in range(0,70):
+        for i in range(0,70/10):
             self.world.tick()
-            time.sleep(0.05)
+            time.sleep(0.01)
 
         print("Spawn Sensors")
         self.sensors = [Sensor(world=self.world, attach_to=self.ego_vehicle.get_actor(), **sensor_config) for sensor_config in scene_config["calibrated_sensors"]["sensors"]]
@@ -225,12 +242,13 @@ class Client:
         for i,response in enumerate(self.client.apply_batch_sync(sensors_batch)):
             if not response.error:
                 self.sensors[i].set_actor(response.actor_id)
-            else:
-                print(response.error)
+            # else:
+            #     print(response.error)
         self.sensors = list(filter(lambda sensor:sensor.get_actor(),self.sensors))
 
     def tick(self):
         self.world.tick()
+
 
     def generate_random_scene(self,scene_config):
         print("generate random scene start!")
@@ -262,8 +280,11 @@ class Client:
 
         if 'distance' in scene_config:
             nearby_spawn_points = [sp for sp in spawn_points if sp.location.distance(self.ego_vehicle.get_actor().get_transform().location) < scene_config['distance']]
+            
+            nearby_spawn_points = nearby_spawn_points[0:250]
         else:
             nearby_spawn_points = spawn_points
+            nearby_spawn_points = nearby_spawn_points[0:250]
         print("Spawn Vehicles")
         vehicle_bp_list = self.world.get_blueprint_library().filter("vehicle")
         vehicle_bp_list = [bp for bp in vehicle_bp_list if bp.id != "vehicle..ballooncar"]
@@ -276,19 +297,21 @@ class Client:
         vehicles_batch = [SpawnActor(vehicle.blueprint,vehicle.transform)
                             .then(SetAutopilot(FutureActor, True, self.trafficmanager.get_port())) 
                             for vehicle in self.vehicles]
-
+        vehicle_success = True
         for i,response in enumerate(self.client.apply_batch_sync(vehicles_batch)):
             if not response.error:
                 self.vehicles[i].set_actor(response.actor_id)
-            else:
-                print(response.error)
+            elif response.error != "Spawn failed because of collision at spawn position" and response.error != 'Spawn failed because of invalid actor description':
+                vehicle_success = False
+            # else:
+            #     print(response.error)
         self.vehicles = list(filter(lambda vehicle:vehicle.get_actor(),self.vehicles))
 
         # Disable spawining of dummy target + ISO target by filtering out
         walker_bp_list = self.world.get_blueprint_library().filter("*.pedestrian.[0-9][0-9][0-5][0-2]")
         print(f"Found: {len(walker_bp_list)} walkers")      
         self.walkers = []
-        for i in range(random.randint(len(nearby_spawn_points),len(nearby_spawn_points)*4)):
+        for i in range(random.randint(int(len(nearby_spawn_points)/3),clamp(int(len(nearby_spawn_points)/2),maximum=250))):
             spawn = self.world.get_random_location_from_navigation()
             if spawn != None:
                 bp_name=random.choice(walker_bp_list).id
@@ -298,13 +321,18 @@ class Client:
                 rotation = {"yaw":random.random()*360,"pitch":random.random()*360,"roll":random.random()*360}
                 self.walkers.append(Walker(world=self.world,location=spawn_location,rotation=rotation,destination=destination_location,bp_name=bp_name))
             else:
+                walkers_success = False
                 print("walker generate fail")
+        
+        walkers_success = True
         walkers_batch = [SpawnActor(walker.blueprint,walker.transform) for walker in self.walkers]
         for i,response in enumerate(self.client.apply_batch_sync(walkers_batch)):
             if not response.error:
                 self.walkers[i].set_actor(response.actor_id)
-            else:
-                print(response.error)
+            elif response.error !='Spawn failed because of collision at spawn position':
+                walkers_success = False
+            # else:
+            #     print(response.error)
         self.walkers = list(filter(lambda walker:walker.get_actor(),self.walkers))
         print("Spawn Walkers")
         walker_controller_bp = self.world.get_blueprint_library().find('controller.ai.walker')
@@ -312,8 +340,12 @@ class Client:
         for i,response in enumerate(self.client.apply_batch_sync(walkers_controller_batch)):
                     if not response.error:
                         self.walkers[i].set_controller(response.actor_id)
+                        self.walkers[i].get_actor().set_collisions(True)
+                        self.walkers[i].get_actor().set_simulate_physics(True)
                     else:
-                        print(response.error)
+                        walkers_success = False
+                    # else:
+                    #     print(response.error)
         self.world.tick()
         for walker in self.walkers:
             walker.start()
@@ -323,6 +355,10 @@ class Client:
         for i in range(0,70):
             self.world.tick()
             time.sleep(0.05)
+
+        if not vehicle_success and not walkers_success:
+            print("Error during Vehicle Spawn")
+            return False
 
         print("Spawn Sensors")
         self.sensors = [Sensor(world=self.world, attach_to=self.ego_vehicle.get_actor(), **sensor_config) for sensor_config in scene_config["calibrated_sensors"]["sensors"]]
@@ -334,6 +370,7 @@ class Client:
                 print(response.error)
         self.sensors = list(filter(lambda sensor:sensor.get_actor(),self.sensors))
         print("generate random scene success!")        
+        return True
 
     def destroy_scene(self):
         if self.walkers is not None:
@@ -357,6 +394,8 @@ class Client:
         self.vehicles = None
         self.walkers = None
         self.world.apply_settings(self.original_settings)
+
+        del self.client, self.world
 
     def get_calibrated_sensor(self,sensor):
         sensor_token = generate_token("sensor",sensor.name)
@@ -413,38 +452,77 @@ class Client:
                     num_radar_pts += self.get_num_radar_pts(instance,sensor.get_last_data(),sensor.get_transform())
         return instance_token,visibility_token,attribute_tokens,translation,rotation,size,num_lidar_pts,num_radar_pts
 
-    def get_visibility(self,instance):
-        max_visible_point_count = 0
+    def get_visibility(self,instance, principal_lidar_sensor_data=None):
+        ego_bbox = self.ego_vehicle.get_actor().bounding_box # Local Coordinates
+        lidar_sensor = None
         for sensor in self.sensors:
-            if (sensor.name == self.principal_lidar):
-                ego_position = sensor.get_transform().location
-                ego_position.z += self.ego_vehicle.get_size().z*0.5
-                instance_position = instance.get_transform().location
-                visible_point_count1 = 0
-                visible_point_count2 = 0
-                for i in range(5):
-                    size = instance.get_size()
-                    size.z = 0
-                    check_point = instance_position-(i-2)*size*0.5
-                    ray_points =  self.world.cast_ray(ego_position,check_point)
-                    points = list(filter(lambda point:not self.ego_vehicle.get_actor().bounding_box.contains(point.location,self.ego_vehicle.get_actor().get_transform()) 
-                                        and not instance.get_actor().bounding_box.contains(point.location,instance.get_actor().get_transform()) 
-                                        and point.label is not carla.libcarla.CityObjectLabel.NONE,ray_points))
-                    if not points:
-                        visible_point_count1+=1
-                    size.x = -size.x
-                    check_point = instance_position-(i-2)*size*0.5
-                    ray_points =  self.world.cast_ray(ego_position,check_point)
-                    points = list(filter(lambda point:not self.ego_vehicle.get_actor().bounding_box.contains(point.location,self.ego_vehicle.get_actor().get_transform()) 
-                                        and not instance.get_actor().bounding_box.contains(point.location,instance.get_actor().get_transform()) 
-                                        and point.label is not carla.libcarla.CityObjectLabel.NONE,ray_points))
-                    if not points:
-                        visible_point_count2+=1
-                if max(visible_point_count1,visible_point_count2)>max_visible_point_count:
-                    max_visible_point_count = max(visible_point_count1,visible_point_count2)
-        visibility_dict = {0:0,1:1,2:1,3:2,4:3,5:4}
-        return visibility_dict[max_visible_point_count]
+            if sensor.name == self.principal_lidar:
+                lidar_sensor = sensor
+        if lidar_sensor is None:
+            raise Exception
+               
+        ego_transform = self.ego_vehicle.get_actor().get_transform() #  World Coordinates
 
+        visible_point_count = 0
+
+
+        instance_transform = instance.get_actor().get_transform() # World Coordinates
+        instance_bbox = instance.get_actor().bounding_box # Local Coordinates
+
+        center_bbox = instance_transform.transform(carla.Vector3D(x=instance_bbox.location.x,
+                                                                  y=instance_bbox.location.y,
+                                                                  z=instance_bbox.location.z))
+
+        start_point = ego_transform.transform(carla.Vector3D(   x=ego_bbox.location.x,
+                                                                y=ego_bbox.location.y,
+                                                                z=ego_bbox.location.z+0.5))
+        
+        forward_ego = ego_transform.rotation.get_forward_vector()
+        forward = instance_transform.rotation.get_forward_vector()
+        right = instance_transform.rotation.get_right_vector()
+
+        p1 = center_bbox + forward * instance_bbox.extent.x + right * instance_bbox.extent.y
+        p2 = center_bbox + forward * instance_bbox.extent.x - right * instance_bbox.extent.y
+        p3 = center_bbox - forward * instance_bbox.extent.x + right * instance_bbox.extent.y
+        p4 = center_bbox - forward * instance_bbox.extent.x - right * instance_bbox.extent.y
+
+        query_points = [p1, p2, center_bbox, p3, p4]
+
+        NONE = carla.libcarla.CityObjectLabel.NONE
+
+        if self.debug:
+            plt_points_bbox = np.array([(p.x, p.y) for p in query_points])
+
+            fig = plt.figure(figsize=(30,30))
+            axs = fig.add_subplot(1,1,1)
+
+            if principal_lidar_sensor_data is not None:
+                axs.scatter(principal_lidar_sensor_data[:,0],principal_lidar_sensor_data[:,1],s=0.1)
+            
+            axs.scatter(ego_transform.location.x, ego_transform.location.y,label='Ego')
+            axs.scatter(ego_transform.location.x + forward_ego.x*2, ego_transform.location.y + forward_ego.y*2, label='Ego Front')
+            axs.scatter(plt_points_bbox[:,0],plt_points_bbox[:,1],label='Box')
+        for point_id, point in enumerate(query_points):
+
+            ray_points =  self.world.cast_ray(point,start_point)
+            occluded = any(
+                    not ego_bbox.contains(hit.location,ego_transform) 
+                    and not instance_bbox.contains(hit.location,instance_transform) 
+                    and (hit.label is not NONE and hit.label is not carla.CityObjectLabel.Rider)
+                    for hit in ray_points)
+            if len(ray_points) > 0 and self.debug:
+                plt_points_ray = np.array([(p.location.x, p.location.y) for p in ray_points])
+                axs.scatter(plt_points_ray[:,0],plt_points_ray[:,1],label=f"Point: {point_id}")
+
+            if not occluded and len(ray_points) > 0:
+                visible_point_count+=1
+        if self.debug:
+            axs.legend()
+            axs.set_aspect('equal')
+            fig.savefig('points.png')
+        
+
+        return (0, 1, 1, 2, 3, 4)[visible_point_count]
     def get_attributes(self,instance):
         return self.attribute_dict[instance.bp_name]
     
@@ -485,9 +563,9 @@ class Client:
             #"fog_distance":random.random()*100,
             #"wetness":clamp(random.gauss(0,1)),
             #"fog_falloff":random.random()*5,
-            "scattering_intensity":max(random.random()*2-1,0),
-            "mie_scattering_scale":max(random.random()*2-1,0),
-            "rayleigh_scattering_scale":max(random.random()*2-1,0),
+            #"scattering_intensity":max(random.random()*2-1,0),
+            #"mie_scattering_scale":max(random.random()*2-1,0),
+            #"rayleigh_scattering_scale":max(random.random()*2-1,0),
             #"dust_storm":clamp(random.gauss(0,30))
         }
         return weather_param

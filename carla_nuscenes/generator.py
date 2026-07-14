@@ -3,6 +3,7 @@ from .dataset import Dataset
 import traceback
 import datetime
 import numpy as np
+from queue import Empty
 
 
 class Generator:
@@ -12,6 +13,8 @@ class Generator:
         self.max_fov = config['max_fov']
         self.max_dist = config['max_dist']
         self.perception_sensors = ['sensor.camera.rgb','sensor.other.radar','sensor.lidar.ray_cast','sensor.lidar.thi_lidar', 'sensor.lidar.thi_rotational_lidar']
+        self.debug=config['debug']
+        self.collect_client.debug = self.debug
 
     def generate_dataset(self,load=False):
         self.dataset = Dataset(**self.config["dataset"],load=load)
@@ -74,22 +77,50 @@ class Generator:
                 self.collect_client.tick()
                 # snapshot = self.collect_client.world.get_snapshot()
                 # print(f"World Tick: {snapshot.frame}, {snapshot.timestamp.elapsed_seconds}")
-                if (frame_count+1)%int(scene_config["keyframe_time"]/self.collect_client.settings.fixed_delta_seconds) == 0:
+                if (frame_count)%int(scene_config["keyframe_time"]/self.collect_client.settings.fixed_delta_seconds) == 0:
                     sample_token = self.dataset.update_sample(sample_token,scene_token,*self.collect_client.get_sample())
-                    start_time = datetime.datetime.now()
+                    #start_time = datetime.datetime.now()
+                    principal_lidar_sensor_data = None
                     for sensor in self.collect_client.sensors:
                         if sensor.bp_name in self.perception_sensors:
                             #print(f"{frame_count} Do for Sensor: {sensor.bp_name}, #No. of Samples: {len(sensor.get_data_list())}")
-                            for idx,sample_data in enumerate(sensor.get_data_list()):
-                                ego_pose_token = self.dataset.update_ego_pose(scene_token,calibrated_sensors_token[sensor.name],*self.collect_client.get_ego_pose(sample_data))
-                                is_key_frame = False
-                                if idx == len(sensor.get_data_list())-1:
-                                    is_key_frame = True
-                                samples_data_token[sensor.name] = self.dataset.update_sample_data(samples_data_token[sensor.name],calibrated_sensors_token[sensor.name],sample_token,ego_pose_token,is_key_frame,*self.collect_client.get_sample_data(sample_data))
+                            #for idx in range(sensor.get_data_list().qsize):
+                            idx = 1
+                            timeout = 2.0
+                            while True:
+                                try:
+                                    sample_data = sensor.get_data_list().get(timeout=timeout) # Blocks and waits until sensor data is available
+                                    if sensor.name == self.collect_client.principal_lidar:
+                                        principal_lidar_sensor_data = sample_data
+                                    ego_pose_token = self.dataset.update_ego_pose(scene_token,calibrated_sensors_token[sensor.name],*self.collect_client.get_ego_pose(sample_data))
+                                    is_key_frame = False
+                                    if frame_count != 0:
+                                        if idx == int(scene_config["keyframe_time"] / sensor.frame_rate)-1:
+                                            is_key_frame = True
+                                            timeout = 0.001
+                                    else:
+                                        is_key_frame=True
+                                        timeout = 0.001
+                                    samples_data_token[sensor.name] = self.dataset.update_sample_data(samples_data_token[sensor.name],calibrated_sensors_token[sensor.name],sample_token,ego_pose_token,is_key_frame,*self.collect_client.get_sample_data(sample_data))
+                                    idx +=1
+                                except Empty:
+                                    #print(f"No Sensor data was available for {sensor.name}")
+                                    break
                     #print(f"{frame_count}: Saving the data took: {(datetime.datetime.now() - start_time).total_seconds()}")
                     #start_time = datetime.datetime.now()
                     ego_vehicle = self.collect_client.ego_vehicle.get_actor()
                     num_annos = 0
+
+                    if self.debug:
+                        transformed_lidar_points = []
+                        if principal_lidar_sensor_data is not None:
+                            for data in principal_lidar_sensor_data[1]:
+                                transformed_point = principal_lidar_sensor_data[0].transform(data.point)
+                                transformed_lidar_points.append((transformed_point.x,transformed_point.y,transformed_point.z))
+                        transformed_lidar_points = np.array(transformed_lidar_points)
+                    else:
+                        transformed_lidar_points=None
+        
                     for instance in self.collect_client.walkers+self.collect_client.vehicles:
                         dist = instance.get_actor().get_location().distance(ego_vehicle.get_location())
                         # Check https://carla.readthedocs.io/en/latest/tuto_G_bounding_boxes/
@@ -99,19 +130,19 @@ class Generator:
                         #print(f"Angle: {angle}, Dist: {dist}, of {instance.get_actor().get_transform().location} with respecto to {ego_vehicle.get_transform().location}")
                         if dist < self.max_dist and abs(angle) <= self.max_fov: # NuScenes only uses object within 54 m distance, we furthermore filter to be within a parameterizable FOV
                             #print(f"Generate Annos: {num_annos} of {len(self.collect_client.walkers+self.collect_client.vehicles)} for Instance within dist")
-                            t1 = datetime.datetime.now()
-                            vis = self.collect_client.get_visibility(instance)
+                            #t1 = datetime.datetime.now()
+                            vis = self.collect_client.get_visibility(instance,transformed_lidar_points)
                             if vis > 0:
                                 sample_annos = self.collect_client.get_sample_annotation(scene_token,instance,vis,-1)
                                 #print(f"{frame_count}: Getting CARLA annos took {(datetime.datetime.now()-t1).total_seconds()}")
-                                t1 = datetime.datetime.now()
+                                #t1 = datetime.datetime.now()
                                 samples_annotation_token[instance.get_actor().id]  = self.dataset.update_sample_annotation(samples_annotation_token[instance.get_actor().id],sample_token,*sample_annos)
                                 #print(f"{frame_count}: Update annos dicts took {(datetime.datetime.now()-t1).total_seconds()}")
                                 num_annos += 1
-                    print(f"{frame_count}: Getting Sample Annotations took: {(datetime.datetime.now()-start_time).total_seconds()}")
+                    #print(f"{frame_count}: Getting Sample Annotations took: {(datetime.datetime.now()-start_time).total_seconds()}")
                     #start_time = datetime.datetime.now()
                     for sensor in self.collect_client.sensors:
-                        sensor.get_data_list().clear()
+                        sensor.get_data_list().queue.clear()
                     #print(f"{frame_count}: Clearing Sensor data took: {(datetime.datetime.now()-start_time).total_seconds()}")
         except:
             traceback.print_exc()
