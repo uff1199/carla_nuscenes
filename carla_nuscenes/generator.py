@@ -77,7 +77,7 @@ class Generator:
                 self.collect_client.tick()
                 # snapshot = self.collect_client.world.get_snapshot()
                 # print(f"World Tick: {snapshot.frame}, {snapshot.timestamp.elapsed_seconds}")
-                if (frame_count)%int(scene_config["keyframe_time"]/self.collect_client.settings.fixed_delta_seconds) == 0:
+                if (frame_count+1)%int(scene_config["keyframe_time"]/self.collect_client.settings.fixed_delta_seconds) == 0:
                     sample_token = self.dataset.update_sample(sample_token,scene_token,*self.collect_client.get_sample())
                     #start_time = datetime.datetime.now()
                     principal_lidar_sensor_data = None
@@ -85,27 +85,28 @@ class Generator:
                         if sensor.bp_name in self.perception_sensors:
                             #print(f"{frame_count} Do for Sensor: {sensor.bp_name}, #No. of Samples: {len(sensor.get_data_list())}")
                             #for idx in range(sensor.get_data_list().qsize):
-                            idx = 1
-                            timeout = 2.0
+                            idx = 0
+                            timeout = .1
+                            frame_rate = sensor.frame_rate if sensor.frame_rate != 0.0 else 1 / self.collect_client.settings.fixed_delta_seconds
+                            #expected_no_of_samples = (frame_count + 1 )* self.collect_client.settings.fixed_delta_seconds / frame_rate
                             while True:
                                 try:
                                     sample_data = sensor.get_data_list().get(timeout=timeout) # Blocks and waits until sensor data is available
+                                    idx +=1
                                     if sensor.name == self.collect_client.principal_lidar:
                                         principal_lidar_sensor_data = sample_data
                                     ego_pose_token = self.dataset.update_ego_pose(scene_token,calibrated_sensors_token[sensor.name],*self.collect_client.get_ego_pose(sample_data))
                                     is_key_frame = False
-                                    if frame_count != 0:
-                                        if idx == int(scene_config["keyframe_time"] / sensor.frame_rate)-1:
-                                            is_key_frame = True
-                                            timeout = 0.001
-                                    else:
-                                        is_key_frame=True
-                                        timeout = 0.001
+                                    
+                                    if scene_config["keyframe_time"] ==  idx * sensor.frame_rate:
+                                        is_key_frame = True
+
                                     samples_data_token[sensor.name] = self.dataset.update_sample_data(samples_data_token[sensor.name],calibrated_sensors_token[sensor.name],sample_token,ego_pose_token,is_key_frame,*self.collect_client.get_sample_data(sample_data))
-                                    idx +=1
+                                    
                                 except Empty:
                                     #print(f"No Sensor data was available for {sensor.name}")
-                                    break
+                                    if scene_config["keyframe_time"] <=  idx * sensor.frame_rate:
+                                        break
                     #print(f"{frame_count}: Saving the data took: {(datetime.datetime.now() - start_time).total_seconds()}")
                     #start_time = datetime.datetime.now()
                     ego_vehicle = self.collect_client.ego_vehicle.get_actor()

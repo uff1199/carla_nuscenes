@@ -7,7 +7,7 @@ from .utils import generate_token,get_nuscenes_rt,get_intrinsic,transform_timest
 import random
 import time
 from matplotlib import pyplot as plt
-
+import heapq
 
 '''
         NuScenes
@@ -279,9 +279,16 @@ class Client:
         self.trafficmanager.auto_lane_change(self.ego_vehicle.get_actor(), True)
 
         if 'distance' in scene_config:
-            nearby_spawn_points = [sp for sp in spawn_points if sp.location.distance(self.ego_vehicle.get_actor().get_transform().location) < scene_config['distance']]
             
-            nearby_spawn_points = nearby_spawn_points[0:250]
+            nearby_spawn_points = heapq.nsmallest(
+                250,
+                spawn_points,
+                key=lambda sp: sp.location.distance(
+                    self.ego_vehicle.get_actor().get_transform().location
+                )
+            )
+
+            print(f"No of SpawnPoints near the vehicle {len(nearby_spawn_points)}")
         else:
             nearby_spawn_points = spawn_points
             nearby_spawn_points = nearby_spawn_points[0:250]
@@ -289,7 +296,7 @@ class Client:
         vehicle_bp_list = self.world.get_blueprint_library().filter("vehicle")
         vehicle_bp_list = [bp for bp in vehicle_bp_list if bp.id != "vehicle..ballooncar"]
         self.vehicles = []
-        for spawn_point in nearby_spawn_points[1:random.randint(1,len(nearby_spawn_points))]:
+        for spawn_point in nearby_spawn_points[1:random.randint(int(len(nearby_spawn_points)*0.3),len(nearby_spawn_points))]:
             location = {attr:getattr(spawn_point.location,attr) for attr in ["x","y","z"]}
             rotation = {attr:getattr(spawn_point.rotation,attr) for attr in ["yaw","pitch","roll"]}
             bp_name = random.choice(vehicle_bp_list).id
@@ -311,7 +318,7 @@ class Client:
         walker_bp_list = self.world.get_blueprint_library().filter("*.pedestrian.[0-9][0-9][0-5][0-2]")
         print(f"Found: {len(walker_bp_list)} walkers")      
         self.walkers = []
-        for i in range(random.randint(int(len(nearby_spawn_points)/3),clamp(int(len(nearby_spawn_points)/2),maximum=250))):
+        for i in range(random.randint(100,250)):
             spawn = self.world.get_random_location_from_navigation()
             if spawn != None:
                 bp_name=random.choice(walker_bp_list).id

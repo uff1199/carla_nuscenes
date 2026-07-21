@@ -4,7 +4,7 @@ from pyquaternion import Quaternion
 import json
 
 def transform_timestamp(timestamp):
-    return int(timestamp*10e6)
+    return int(timestamp*1e6)
 
 def generate_token(key,data):
     obj = hashlib.md5(str(key).encode('utf-8'))

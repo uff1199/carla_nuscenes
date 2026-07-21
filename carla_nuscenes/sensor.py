@@ -1,6 +1,7 @@
 import numpy as np
 import carla
 from .actor import Actor
+from queue import Queue
 
 def parse_image(image):
     array = np.ndarray(
@@ -65,10 +66,11 @@ class Sensor(Actor):
         #print(f"Spawn Sensor {name}: {args} ")
         super().__init__(**args)
         self.name = name
-        self.data_list = []
+        self.data_queue = Queue()
+        self.frame_rate = float(args['options']['sensor_tick']) if args['options'] is not None else 0.0
     
     def get_data_list(self):
-        return self.data_list
+        return self.data_queue
     
     def set_actor(self, id):
         super().set_actor(id)
@@ -78,14 +80,14 @@ class Sensor(Actor):
         super().spawn_actor()
         self.actor.listen(self.add_data)
 
-    def get_last_data(self):
-        if self.data_list:
-            return self.data_list[-1]
-        else:
-            return None
+    # def get_last_data(self):
+    #     if self.data_list:
+    #         return self.data_list[-1]
+    #     else:
+    #         return None
             
     def add_data(self,data):
-        self.data_list.append((self.actor.parent.get_transform(),data))
+        self.data_queue.put((self.actor.parent.get_transform(),data))
         # print(f"Add Data to {self.name} - Length: {len(self.data_list)} - timestamp: {data.timestamp*10e6}")
 
     def get_transform(self):
