@@ -38,17 +38,23 @@ class Generator:
                     for scene_config in capture_config["scenes"][self.dataset.data["progress"]["current_scene_index"]:]:
                         no_scenes = scene_config["count"]
                         for scene_count in range(self.dataset.data["progress"]["current_scene_count"],scene_config["count"]):
-                            print(f"Run on Scene {scene_count} of {no_scenes} at {datetime.datetime.now()}")
+                            timestamp_start = datetime.datetime.now()
+                            print(f"Run on Scene {scene_count} of {no_scenes} at {timestamp_start}")
                             self.dataset.update_scene_count()
                             self.add_one_scene(log_token,scene_config)
-                            self.dataset.save()
+                            print(f"Took {datetime.datetime.now() - timestamp_start}, No. of File Writers: {len(self.dataset._write_futures)}")
+                            if self.dataset.data["progress"]["current_scene_count"] % self.dataset.save_iters == 0:
+                                self.dataset.save()
                         self.dataset.update_scene_index()
+                    self.dataset.save()
                     self.dataset.update_capture_index()
                 self.dataset.update_world_index()
             except:
                 traceback.print_exc()
             finally:
                 self.collect_client.destroy_world()
+        self.dataset.save()
+        self.dataset.shutdown_writer()
                 
     def add_one_scene(self,log_token,scene_config):
         try:
@@ -80,13 +86,13 @@ class Generator:
                     sample_token = self.dataset.update_sample(sample_token,scene_token,*self.collect_client.get_sample())
                     #start_time = datetime.datetime.now()
                     principal_lidar_sensor_data = None
-                    print("frame count:",frame_count)
+                    #print("frame count:",frame_count)
                     for sensor in self.collect_client.sensors:
                         if sensor.bp_name in self.perception_sensors:
                             #print(f"{frame_count} Do for Sensor: {sensor.bp_name}, #No. of Samples: {len(sensor.get_data_list())}")
                             #for idx in range(sensor.get_data_list().qsize):
                             idx = 0
-                            timeout = .1
+                            timeout = .05
                             frame_rate = sensor.frame_rate if sensor.frame_rate != 0.0 else 1 / self.collect_client.settings.fixed_delta_seconds
                             #expected_no_of_samples = (frame_count + 1 )* self.collect_client.settings.fixed_delta_seconds / frame_rate
                             while True:

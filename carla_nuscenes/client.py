@@ -422,7 +422,7 @@ class Client:
             for sensor in self.sensors:
                 if self.world.get_actor(sensor.id) != None:
                     sensor.destroy()
-        if self.ego_vehicle is not None:
+        if self.ego_vehicle.actor is not None:
             self.ego_vehicle.destroy()
 
 
@@ -470,7 +470,7 @@ class Client:
         id = hash((scene_token,instance.get_actor().id))
         return category_token,id
 
-    def get_sample_annotation(self,scene_token,instance,visibility=1,no_pts=1):
+    def get_sample_annotation(self,scene_token,instance,visibility=1,no_pts=-1):
         instance_token = generate_token("instance",hash((scene_token,instance.get_actor().id)))
     
         visibility_token = str(visibility)

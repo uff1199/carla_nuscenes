@@ -2,6 +2,8 @@ dataset:
   root: "./nuScenesCarla/dataset"
   #root: "./test_data/dataset"
   version: "v1.16"
+  save_workers: 24
+  save_iters: 15 
 
 client:
   host: localhost
@@ -25,6 +27,7 @@ scene_count: 1000
 max_fov: 360
 max_dist: 70
 debug: False
+
 
 worlds:  #map
   - 

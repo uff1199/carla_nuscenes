@@ -5,24 +5,30 @@ from queue import Queue
 from PIL import Image
 
 class SensorSnapshot:
-    __slots__ = ("timestamp")
+    __slots__ = ("timestamp",)
     def __init__(self, sensor_data):
         self.timestamp = sensor_data.timestamp
 
 class LidarSnapshot(SensorSnapshot):
-    __slots__ = ("data_array", "channels", "_point_counts")
+    __slots__ = ("raw_data", "channels", "_point_counts")
     def __init__(self, sensor_data):
         super().__init__(sensor_data)
-        self.data_array = np.copy(np.frombuffer(sensor_data.raw_data, dtype=np.dtype('f4')))  # owned copy, not a view
+        self.raw_data = bytes(sensor_data.raw_data)
         self.channels = sensor_data.channels
         self._point_counts = [sensor_data.get_point_count(ch) for ch in range(sensor_data.channels)]
     def get_point_count(self, ch):
         return self._point_counts[ch]
+    @property
+    def data_array(self):
+        return np.frombuffer(self.raw_data, dtype=np.dtype('f4'))
 
 class THILidarSnapshot(SensorSnapshot):
-    __slots__ = ("data_array","raw_data")
+    __slots__ = ("raw_data",)
     def __init__(self,sensor_data):
         super().__init__(sensor_data)
+        self.raw_data = bytes(sensor_data.raw_data)
+    @property
+    def data_array(self):
         dtype= np.dtype([
             ('x',np.float32),
             ('y',np.float32),
@@ -30,33 +36,36 @@ class THILidarSnapshot(SensorSnapshot):
             ('reflectivity',np.float32),
             ('intensity',np.float32),
             ('object_tag',np.float32)])
-        self.data_array = np.copy(np.frombuffer(sensor_data.raw_data,dtype=dtype))
+        return np.frombuffer(self.raw_data, dtype=dtype)
 
 class RadarSnapshot(SensorSnapshot):
-    __slots__ = ("data_array","raw_data")
+    __slots__ = ("raw_data",)
     def __init__(self,sensor_data):
          super().__init__(sensor_data)
-         self.data_array = np.copy(np.frombuffer(sensor_data.raw_data, dtype=np.dtype('f4')))
+         self.raw_data = bytes(sensor_data.raw_data)
+    @property
+    def data_array(self):
+        return np.frombuffer(self.raw_data, dtype=np.dtype('f4'))
 
 
 class CameraSnapshot(SensorSnapshot):
-    __slots__ = ("data_array","height", "width")
+    __slots__ = ("raw_data","height", "width")
     def __init__(self,sensor_data):
          super().__init__(sensor_data)
-         self.data_array = np.copy(np.ndarray(
-            shape=(sensor_data.height, sensor_data.width, 4),
-            dtype=np.uint8, buffer=sensor_data.raw_data,order="C"))
+         self.raw_data = bytes(sensor_data.raw_data)
          self.height = sensor_data.height
          self.width = sensor_data.width
+    @property
+    def data_array(self):
+         return np.frombuffer(self.raw_data, dtype=np.uint8).reshape((self.height, self.width, 4))
 
     def save_to_disk(self,path):
         image = self.data_array
-        img = image.reshape((self.height, self.width, 4))
-        img = img[:, :, :3]
+        img = image[:, :, :3]
         img = img[:, :, ::-1]
-        
         pil_image = Image.fromarray(img)
         pil_image.save(path)
+
 
 def parse_image(image):
     array = image.data_array

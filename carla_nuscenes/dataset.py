@@ -1,4 +1,5 @@
 import os
+from concurrent.futures import ThreadPoolExecutor, wait
 from .utils import load,dump,generate_token
 import carla
 from .sensor import parse_lidar_data,parse_radar_data, parse_thi_lidar_data, LidarSnapshot, THILidarSnapshot, RadarSnapshot, CameraSnapshot
@@ -43,10 +44,11 @@ def mkdir(path):
         os.mkdir(path)
 
 class Dataset:
-    def __init__(self,root,version,load=False):
+    def __init__(self,root,version,load=False,save_workers=4, save_iters=2):
         self.root = root
         self.version = version
         self.json_dir = os.path.join(root,version)
+        self.save_iters = save_iters
         mkdir(self.root)
         mkdir(self.json_dir)
         mkdir(os.path.join(self.root,"maps"))
@@ -89,10 +91,25 @@ class Dataset:
         }
 
         self.data_cache = {}
+        self._write_executor = ThreadPoolExecutor(max_workers=save_workers)
+        self._write_futures = []
         if load:
             self.load()
         else:
             self.save()
+
+    def _submit_sensor_write(self, data, path):
+        future = self._write_executor.submit(save_sensor_data, data, path)
+        self._write_futures.append(future)
+
+    def wait_for_pending_writes(self):
+        if self._write_futures:
+            wait(self._write_futures)
+            self._write_futures = []
+
+    def shutdown_writer(self):
+        self.wait_for_pending_writes()
+        self._write_executor.shutdown(wait=True)
 
     def load(self):
         for key in self.data:
@@ -104,10 +121,11 @@ class Dataset:
                 self.index[key][val['token']]=val
 
     def save(self):
+        self.wait_for_pending_writes()
         for key in self.data:
             json_path = os.path.join(self.json_dir,key+".json")
             dump(self.data[key],json_path)
-            print(json_path)
+            print(f"Save: {json_path}")
 
     def get_item(self,key,token):
         return self.index[key].get(token)
@@ -245,7 +263,8 @@ class Dataset:
         sample_data_item["prev"] = prev
         sample_data_item["next"] = ""
         filename = self.get_filename(sample_data_item)
-        save_sensor_data(sample_data[1],os.path.join(self.root,filename))
+        self._submit_sensor_write(sample_data[1],os.path.join(self.root,filename))
+        #save_sensor_data(sample_data[1],os.path.join(self.root,filename))
         #print(filename)
         sample_data_item["filename"] = filename
         if prev != "":
