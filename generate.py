@@ -4,7 +4,7 @@ import yaml
 import datetime
 from yamlinclude import YamlIncludeConstructor
 YamlIncludeConstructor.add_to_loader_class(loader_class=yaml.FullLoader)
-config_path = "./configs/config3.yaml"
+config_path = "./configs/config_paper.yaml"
 with open(config_path,'r') as f:
     config = yaml.load(f.read(),Loader=yaml.FullLoader)
 runner = Generator(config)

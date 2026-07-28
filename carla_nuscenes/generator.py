@@ -73,7 +73,6 @@ class Generator:
             sample_token = ""
             # print(f"Delta Sim: {self.collect_client.settings.fixed_delta_seconds}, Max. Frame: {int(scene_config['collect_time']/self.collect_client.settings.fixed_delta_seconds)}, Divider {int(scene_config['keyframe_time']/self.collect_client.settings.fixed_delta_seconds)}")
             for frame_count in range(int(scene_config['collect_time']/self.collect_client.settings.fixed_delta_seconds)):
-                #print("frame count:",frame_count)
                 self.collect_client.tick()
                 # snapshot = self.collect_client.world.get_snapshot()
                 # print(f"World Tick: {snapshot.frame}, {snapshot.timestamp.elapsed_seconds}")
@@ -81,6 +80,7 @@ class Generator:
                     sample_token = self.dataset.update_sample(sample_token,scene_token,*self.collect_client.get_sample())
                     #start_time = datetime.datetime.now()
                     principal_lidar_sensor_data = None
+                    print("frame count:",frame_count)
                     for sensor in self.collect_client.sensors:
                         if sensor.bp_name in self.perception_sensors:
                             #print(f"{frame_count} Do for Sensor: {sensor.bp_name}, #No. of Samples: {len(sensor.get_data_list())}")
@@ -101,7 +101,12 @@ class Generator:
                                     if scene_config["keyframe_time"] ==  idx * sensor.frame_rate:
                                         is_key_frame = True
 
-                                    samples_data_token[sensor.name] = self.dataset.update_sample_data(samples_data_token[sensor.name],calibrated_sensors_token[sensor.name],sample_token,ego_pose_token,is_key_frame,*self.collect_client.get_sample_data(sample_data))
+                                    samples_data_token[sensor.name] = self.dataset.update_sample_data(samples_data_token[sensor.name],
+                                                                                                      calibrated_sensors_token[sensor.name],
+                                                                                                      sample_token,
+                                                                                                      ego_pose_token,
+                                                                                                      is_key_frame,
+                                                                                                      *self.collect_client.get_sample_data(sample_data))
                                     
                                 except Empty:
                                     #print(f"No Sensor data was available for {sensor.name}")
@@ -113,6 +118,7 @@ class Generator:
                     num_annos = 0
 
                     if self.debug:
+                        # THis is no longer working with the Memory Mirrow
                         transformed_lidar_points = []
                         if principal_lidar_sensor_data is not None:
                             for data in principal_lidar_sensor_data[1]:
@@ -142,8 +148,8 @@ class Generator:
                                 num_annos += 1
                     #print(f"{frame_count}: Getting Sample Annotations took: {(datetime.datetime.now()-start_time).total_seconds()}")
                     #start_time = datetime.datetime.now()
-                    for sensor in self.collect_client.sensors:
-                        sensor.get_data_list().queue.clear()
+                    # for sensor in self.collect_client.sensors:
+                    #     sensor.get_data_list().queue.clear()
                     #print(f"{frame_count}: Clearing Sensor data took: {(datetime.datetime.now()-start_time).total_seconds()}")
         except:
             traceback.print_exc()

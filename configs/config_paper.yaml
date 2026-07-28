@@ -1,0 +1,133 @@
+dataset:
+  root: "./nuScenesCarla/dataset"
+  #root: "./test_data/dataset"
+  version: "v1.16"
+
+client:
+  host: localhost
+  port: 2000
+  time_out: 10.0
+
+sensors:
+  !include ./configs/sensors.yaml
+
+categories:
+  !include ./configs/categories.yaml
+
+attributes:
+  !include ./configs/attributes.yaml
+
+visibility:
+  !include ./configs/visibility.yaml 
+
+scene_count: 1000
+
+max_fov: 360
+max_dist: 70
+debug: False
+
+worlds:  #map
+  - 
+    map_name: "Town10HD_Opt"
+    map_category: "semantic_prior"
+    settings:
+      fixed_delta_seconds: 0.01
+    captures: #log
+      - 
+        date: "2026-07-16"
+        time: "19-18-00"
+        timezone: "+0200"
+        capture_vehicle: "c0003"
+        location: "Ingolstadt"
+        scenes:
+          - 
+            count: 300
+            custom: False
+            collect_time: 20
+            keyframe_time: 0.5
+            distance: 100
+            spawns: 500
+            ego_bp_name: "vehicle.bmw.m8"
+            #ego_bp_name: "vehicle.tesla.model3"
+            calibrated_sensors:
+              !include ./configs/calibrated_sensors_thi.yaml
+            description:
+              "A downtown urban environment with skyscrapers, residential buildings and an ocean promenade."
+  - 
+    map_name: "Town04_Opt"
+    map_category: "semantic_prior"
+    settings:
+      fixed_delta_seconds: 0.01
+    captures: #log
+      - 
+        date: "2026-07-19"
+        time: "10-45-20"
+        timezone: "+0200"
+        capture_vehicle: "c0003"
+        location: "Ingolstadt"
+        scenes:
+          - 
+            count: 150
+            custom: False
+            collect_time: 20
+            keyframe_time: 0.5
+            distance: 60
+            spawns: 500
+            ego_bp_name: "vehicle.bmw.m8"
+            calibrated_sensors:
+              !include ./configs/calibrated_sensors_thi.yaml
+            description:
+              "A small town embedded in the mountains with a special figure of 8 infinite highway."
+  - 
+    map_name: "Town03_Opt"
+    map_category: "semantic_prior"
+    settings:
+      fixed_delta_seconds: 0.01
+    captures: #log
+      - 
+        date: "2026-07-20"
+        time: "10-45-20"
+        timezone: "+0200"
+        capture_vehicle: "c0003"
+        location: "Ingolstadt"
+        scenes:
+          - 
+            count: 150
+            custom: False
+            collect_time: 20
+            keyframe_time: 0.5
+            distance: 60
+            spawns: 500
+            ego_bp_name: "vehicle.bmw.m8"
+            calibrated_sensors:
+              !include ./configs/calibrated_sensors_thi.yaml
+            description:
+              "A larger, urban map with a roundabout and large junctions."
+
+  -
+    map_name: "Grid0828"
+    map_category: "semantic_prior"
+    settings:
+      fixed_delta_seconds: 0.01
+    captures: #log
+      - 
+        date: "2026-07-18"
+        time: "19-13-00"
+        timezone: "+0200"
+        capture_vehicle: "c0003"
+        location: "Ingolstadt"
+        scenes:
+          - 
+            count: 400
+            custom: False
+            collect_time: 20
+            keyframe_time: 0.5
+            distance: 100
+            spawns: 500
+            ego_bp_name: "vehicle.bmw.m8"
+            #ego_bp_name: "vehicle.tesla.model3"
+            calibrated_sensors:
+              !include ./configs/calibrated_sensors_thi.yaml
+            description:
+              "A small simple town with a mixture of residential and commercial buildings."
+  

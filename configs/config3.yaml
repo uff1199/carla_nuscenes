@@ -1,0 +1,151 @@
+dataset:
+  #root: "./nuScenesCarla/dataset"
+  root: "./test_data/dataset"
+  version: "v1.16"
+
+client:
+  host: localhost
+  port: 2000
+  time_out: 5.0
+
+sensors:
+  !include ./configs/sensors.yaml
+
+categories:
+  !include ./configs/categories.yaml
+
+attributes:
+  !include ./configs/attributes.yaml
+
+visibility:
+  !include ./configs/visibility.yaml 
+
+scene_count: 500
+
+max_fov: 360
+max_dist: 70
+debug: False
+
+worlds:  #map
+  - 
+    map_name: "Town10HD_Opt"
+    map_category: "semantic_prior"
+    settings:
+      fixed_delta_seconds: 0.01
+    captures: #log
+      - 
+        date: "2026-07-16"
+        time: "19-18-00"
+        timezone: "+0200"
+        capture_vehicle: "c0003"
+        location: "Ingolstadt"
+        scenes:
+          - 
+            count: 125
+            custom: False
+            collect_time: 20
+            keyframe_time: 0.5
+            distance: 100
+            ego_bp_name: "vehicle.bmw.m8"
+            #ego_bp_name: "vehicle.tesla.model3"
+            calibrated_sensors:
+              !include ./configs/calibrated_sensors_thi.yaml
+            description:
+              "A downtown urban environment with skyscrapers, residential buildings and an ocean promenade."
+  - 
+    map_name: "Town05_Opt"
+    map_category: "semantic_prior"
+    settings:
+      fixed_delta_seconds: 0.01
+    captures: #log
+      - 
+        date: "2026-07-17"
+        time: "15-00-00"
+        timezone: "+0200"
+        capture_vehicle: "c0003"
+        location: "Ingolstadt"
+        scenes:
+          - 
+            count: 125
+            custom: False
+            collect_time: 20
+            keyframe_time: 0.5
+            distance: 60
+            ego_bp_name: "vehicle.bmw.m8"
+            calibrated_sensors:
+              !include ./configs/calibrated_sensors_thi.yaml
+            description:
+              "Squared-grid town with cross junctions and a bridge. It has multiple lanes per direction. Useful to perform lane changes."
+  - 
+    map_name: "Town04_Opt"
+    map_category: "semantic_prior"
+    settings:
+      fixed_delta_seconds: 0.01
+    captures: #log
+      - 
+        date: "2026-07-19"
+        time: "10-45-20"
+        timezone: "+0200"
+        capture_vehicle: "c0003"
+        location: "Ingolstadt"
+        scenes:
+          - 
+            count: 125
+            custom: False
+            collect_time: 20
+            keyframe_time: 0.5
+            distance: 60
+            ego_bp_name: "vehicle.bmw.m8"
+            calibrated_sensors:
+              !include ./configs/calibrated_sensors_thi.yaml
+            description:
+              "A small town embedded in the mountains with a special figure of 8 infinite highway."
+  - 
+    map_name: "Town03_Opt"
+    map_category: "semantic_prior"
+    settings:
+      fixed_delta_seconds: 0.01
+    captures: #log
+      - 
+        date: "2026-07-20"
+        time: "10-45-20"
+        timezone: "+0200"
+        capture_vehicle: "c0003"
+        location: "Ingolstadt"
+        scenes:
+          - 
+            count: 125
+            custom: False
+            collect_time: 20
+            keyframe_time: 0.5
+            distance: 60
+            ego_bp_name: "vehicle.bmw.m8"
+            calibrated_sensors:
+              !include ./configs/calibrated_sensors_thi.yaml
+            description:
+              "A larger, urban map with a roundabout and large junctions."
+  # - 
+  #   map_name: "Grid0828"
+  #   map_category: "semantic_prior"
+  #   settings:
+  #     fixed_delta_seconds: 0.01
+  #   captures: #log
+  #     - 
+  #       date: "2026-07-18"
+  #       time: "19-13-00"
+  #       timezone: "+0200"
+  #       capture_vehicle: "c0003"
+  #       location: "Ingolstadt"
+  #       scenes:
+  #         - 
+  #           count: 300
+  #           custom: False
+  #           collect_time: 20
+  #           keyframe_time: 0.25
+  #           distance: 100
+  #           ego_bp_name: "vehicle.bmw.m8"
+  #           #ego_bp_name: "vehicle.tesla.model3"
+  #           calibrated_sensors:
+  #             !include ./configs/calibrated_sensors_thi.yaml
+  #           description:
+  #             "A small simple town with a mixture of residential and commercial buildings."

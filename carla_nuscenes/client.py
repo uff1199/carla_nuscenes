@@ -252,8 +252,8 @@ class Client:
 
     def generate_random_scene(self,scene_config):
         print("generate random scene start!")
-        self.weather = carla.WeatherParameters(**self.get_random_weather())
-        self.world.set_weather(self.weather)
+        #self.weather = carla.WeatherParameters(**self.get_random_weather())
+        #self.world.set_weather(self.weather)
 
 
         SpawnActor = carla.command.SpawnActor
@@ -278,17 +278,18 @@ class Client:
         self.trafficmanager.vehicle_percentage_speed_difference(self.ego_vehicle.get_actor(),-20)
         self.trafficmanager.auto_lane_change(self.ego_vehicle.get_actor(), True)
 
-        if 'distance' in scene_config:
+        if 'distance' in scene_config and 'spawns' in scene_config:
             
             nearby_spawn_points = heapq.nsmallest(
-                250,
+                scene_config['spawns'],
                 spawn_points,
                 key=lambda sp: sp.location.distance(
-                    self.ego_vehicle.get_actor().get_transform().location
+                    spawn_points[0].location
                 )
             )
 
             print(f"No of SpawnPoints near the vehicle {len(nearby_spawn_points)}")
+
         else:
             nearby_spawn_points = spawn_points
             nearby_spawn_points = nearby_spawn_points[0:250]
@@ -296,7 +297,7 @@ class Client:
         vehicle_bp_list = self.world.get_blueprint_library().filter("vehicle")
         vehicle_bp_list = [bp for bp in vehicle_bp_list if bp.id != "vehicle..ballooncar"]
         self.vehicles = []
-        for spawn_point in nearby_spawn_points[1:random.randint(int(len(nearby_spawn_points)*0.3),len(nearby_spawn_points))]:
+        for spawn_point in nearby_spawn_points[1:random.randint(int(len(nearby_spawn_points)*0.1),len(nearby_spawn_points))]:
             location = {attr:getattr(spawn_point.location,attr) for attr in ["x","y","z"]}
             rotation = {attr:getattr(spawn_point.rotation,attr) for attr in ["yaw","pitch","roll"]}
             bp_name = random.choice(vehicle_bp_list).id
@@ -318,18 +319,47 @@ class Client:
         walker_bp_list = self.world.get_blueprint_library().filter("*.pedestrian.[0-9][0-9][0-5][0-2]")
         print(f"Found: {len(walker_bp_list)} walkers")      
         self.walkers = []
-        for i in range(random.randint(100,250)):
+        spawns_walkers = set()
+
+        no_of_walkers = 500
+        for i in range(no_of_walkers):
             spawn = self.world.get_random_location_from_navigation()
             if spawn != None:
-                bp_name=random.choice(walker_bp_list).id
-                spawn_location = {attr:getattr(spawn,attr) for attr in ["x","y","z"]}
-                destination=self.world.get_random_location_from_navigation()
-                destination_location={attr:getattr(destination,attr) for attr in ["x","y","z"]}
-                rotation = {"yaw":random.random()*360,"pitch":random.random()*360,"roll":random.random()*360}
-                self.walkers.append(Walker(world=self.world,location=spawn_location,rotation=rotation,destination=destination_location,bp_name=bp_name))
-            else:
-                walkers_success = False
-                print("walker generate fail")
+                if spawn.distance(spawn_points[0].location) < scene_config['distance']:
+                    spawns_walkers.add(spawn)
+        print(f"No of WalkerLocations near the vehicle {len(spawns_walkers)}")
+        selected = random.randint(10,250)
+        spawns_walkers = list(spawns_walkers)
+        for spawn in spawns_walkers[0:selected]:
+        
+            bp_name=random.choice(walker_bp_list).id
+            spawn_location = {attr:getattr(spawn,attr) for attr in ["x","y","z"]}
+            destination=self.world.get_random_location_from_navigation()
+            destination_location={attr:getattr(destination,attr) for attr in ["x","y","z"]}
+            rotation = {"yaw":random.random()*360,"pitch":random.random()*360,"roll":random.random()*360}
+            self.walkers.append(Walker(world=self.world,location=spawn_location,rotation=rotation,destination=destination_location,bp_name=bp_name))
+
+        debug = False
+        if debug:
+            from matplotlib import pyplot as plt
+
+            spawn_points_xy = np.array([(sp.location.x, sp.location.y) for sp in  spawn_points])
+            nearby_spawn_points_xy = np.array([(sp.location.x, sp.location.y) for sp in  nearby_spawn_points])
+            walker_spawn_points_xy = np.array([(sp.x, sp.y) for sp in  spawns_walkers])
+
+            print(f"Spawn Points {spawn_points_xy.shape}, Nearby: {nearby_spawn_points_xy.shape}")
+
+            fig = plt.figure(figsize=(30,30))
+
+            axs = fig.add_subplot(1,1,1)
+
+            axs.scatter(spawn_points_xy[:,0],spawn_points_xy[:,1],s=0.1,label='Spawn Points Map')
+            axs.scatter(nearby_spawn_points_xy[:,0],nearby_spawn_points_xy[:,1],s=0.2,label='Selected Spawn Points')
+            axs.scatter(walker_spawn_points_xy[:,0],walker_spawn_points_xy[:,1],s=0.2,label='Walker Spawn Points')
+            axs.scatter(ego_location['x'],ego_location['y'],s=5.0,marker='x', label='Ego Vehicle')
+            axs.legend()
+            axs.grid()
+            fig.savefig(f'spawn_points_{time.time_ns()}.png')
         
         walkers_success = True
         walkers_batch = [SpawnActor(walker.blueprint,walker.transform) for walker in self.walkers]
@@ -359,9 +389,8 @@ class Client:
 
         ## Wait for a few simulation steps until the vehicles have stopped falling down
         print("Wait for Actors to settle")
-        for i in range(0,70):
+        for i in range(0,int(0.5/self.settings.fixed_delta_seconds)):
             self.world.tick()
-            time.sleep(0.05)
 
         if not vehicle_success and not walkers_success:
             print("Error during Vehicle Spawn")
@@ -383,13 +412,16 @@ class Client:
         if self.walkers is not None:
             for walker in self.walkers:
                 walker.controller.stop()
-                walker.destroy()
+                if self.world.get_actor(walker.id) != None:
+                    walker.destroy()
         if self.vehicles is not None:
             for vehicle in self.vehicles:
-                vehicle.destroy()
+                if self.world.get_actor(vehicle.id) != None:
+                    vehicle.destroy()
         if self.sensors is not None:
             for sensor in self.sensors:
-                sensor.destroy()
+                if self.world.get_actor(sensor.id) != None:
+                    sensor.destroy()
         if self.ego_vehicle is not None:
             self.ego_vehicle.destroy()
 
@@ -425,7 +457,7 @@ class Client:
     def get_sample_data(self,sample_data):
         height = 0
         width = 0
-        if isinstance(sample_data[1],carla.Image):
+        if isinstance(sample_data[1],CameraSnapshot):
             height = sample_data[1].height
             width = sample_data[1].width
         return sample_data,height,width
@@ -438,12 +470,10 @@ class Client:
         id = hash((scene_token,instance.get_actor().id))
         return category_token,id
 
-    def get_sample_annotation(self,scene_token,instance,visibility=-1,no_pts=1):
+    def get_sample_annotation(self,scene_token,instance,visibility=1,no_pts=1):
         instance_token = generate_token("instance",hash((scene_token,instance.get_actor().id)))
-        if visibility < 0:
-            visibility_token = str(self.get_visibility(instance))
-        else:
-            visibility_token = str(visibility)
+    
+        visibility_token = str(visibility)
         
         attribute_tokens = [generate_token("attribute",attribute) for attribute in self.get_attributes(instance)]
         # get_nuscenes_rt transfroms from left hand to right hand coordinate system

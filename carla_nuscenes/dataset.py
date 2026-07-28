@@ -1,7 +1,7 @@
 import os
 from .utils import load,dump,generate_token
 import carla
-from .sensor import parse_lidar_data,parse_radar_data, parse_thi_lidar_data
+from .sensor import parse_lidar_data,parse_radar_data, parse_thi_lidar_data, LidarSnapshot, THILidarSnapshot, RadarSnapshot, CameraSnapshot
 from copy import deepcopy
 
 def save_image(image,path):
@@ -29,13 +29,13 @@ def save_radar_data(radar_data,path):
     points.tofile(path)
 
 def save_sensor_data(data,path):
-    if isinstance(data,carla.Image):
+    if isinstance(data,CameraSnapshot):
         save_image(data,path)
-    elif isinstance(data,carla.RadarMeasurement):
+    elif isinstance(data,RadarSnapshot):
         save_radar_data(data,path)
-    elif isinstance(data,carla.LidarMeasurement):
+    elif isinstance(data,LidarSnapshot):
         save_lidar_data(data,path)   
-    elif isinstance(data,carla.THILidarMeasurement):
+    elif isinstance(data,THILidarSnapshot):
         save_thi_lidar_data(data,path)
 
 def mkdir(path):
@@ -96,7 +96,7 @@ class Dataset:
 
     def load(self):
         for key in self.data:
-            #print(f"Load Key: {key}")
+            print(f"Load Key: {key}")
             json_path = os.path.join(self.json_dir,key+".json")
             self.data[key] = load(json_path)
         for key in self.index:

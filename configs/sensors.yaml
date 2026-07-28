@@ -51,13 +51,13 @@
     modality: 'lidar'
 
 - 
-    name: 'LIDAR_TOP_DEFAULT_INTENSITY'
-    modality: 'lidar'
-
-- 
     name: 'LIDAR_TOP_DEFAULT'
     modality: 'lidar'
 
 -
     name: 'LIDAR_TOP_VOXELSCAPE'
+    modality: 'lidar'
+
+- 
+    name: 'LIDAR_TOP_SPINNING'
     modality: 'lidar'

@@ -10,9 +10,11 @@ class Actor:
         self.transform = carla.Transform(carla.Location(**location),carla.Rotation(**rotation))
         self.attach_to = attach_to
         self.actor = None
+        self.id = None
 
     def set_actor(self,id):
         self.actor = self.world.get_actor(id)
+        self.id = id
 
     def spawn_actor(self):
         self.actor = self.world.spawn_actor(self.blueprint,self.transform,self.attach_to)
