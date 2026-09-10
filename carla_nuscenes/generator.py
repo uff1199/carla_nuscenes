@@ -4,7 +4,8 @@ import traceback
 import datetime
 import numpy as np
 from queue import Empty
-
+import time
+import sys
 
 class Generator:
     def __init__(self,config):
@@ -12,7 +13,9 @@ class Generator:
         self.collect_client = Client(self.config["client"])
         self.max_fov = config['max_fov']
         self.max_dist = config['max_dist']
-        self.perception_sensors = ['sensor.camera.rgb','sensor.other.radar','sensor.lidar.ray_cast','sensor.lidar.thi_lidar', 'sensor.lidar.thi_rotational_lidar']
+        self.perception_sensors = ['sensor.camera.rgb','sensor.other.radar','sensor.lidar.ray_cast',
+                                   'sensor.lidar.thi_lidar', 'sensor.lidar.gbuffer_lidar',
+                                   'sensor.lidar.gbuffer_rotational_lidar', 'sensor.lidar.thi_rotational_lidar']
         self.debug=config['debug']
         self.collect_client.debug = self.debug
 
@@ -45,16 +48,23 @@ class Generator:
                             print(f"Took {datetime.datetime.now() - timestamp_start}, No. of File Writers: {len(self.dataset._write_futures)}")
                             if self.dataset.data["progress"]["current_scene_count"] % self.dataset.save_iters == 0:
                                 self.dataset.save()
+                            if self.dataset.data["progress"]["current_scene_count"] + 1 % self.collect_client.reload_iters == 0:
+                                self.collect_client.generate_world(world_config,force_reload=True)
                         self.dataset.update_scene_index()
                     self.dataset.save()
                     self.dataset.update_capture_index()
                 self.dataset.update_world_index()
-            except:
-                traceback.print_exc()
+                error=''
+            except RuntimeError:
+                error = str(sys.exc_info()[1])
+                print(f"External: {error}")
+                if "time-out" in error or "futures" in error:
+                    sys.exit(1)
             finally:
+                self.dataset.save()
+                self.dataset.shutdown_writer()
                 self.collect_client.destroy_world()
-        self.dataset.save()
-        self.dataset.shutdown_writer()
+
                 
     def add_one_scene(self,log_token,scene_config):
         try:
@@ -77,9 +87,18 @@ class Generator:
                 samples_data_token[sensor.name] = ""
 
             sample_token = ""
+            average_time = []
+            min_time=scene_config['client_time']
             # print(f"Delta Sim: {self.collect_client.settings.fixed_delta_seconds}, Max. Frame: {int(scene_config['collect_time']/self.collect_client.settings.fixed_delta_seconds)}, Divider {int(scene_config['keyframe_time']/self.collect_client.settings.fixed_delta_seconds)}")
             for frame_count in range(int(scene_config['collect_time']/self.collect_client.settings.fixed_delta_seconds)):
+                t0 = time.time_ns()
                 self.collect_client.tick()
+                t1 = time.time_ns()
+                time_delta = (t1 - t0)/1e9
+                if time_delta <  min_time:
+                    time.sleep(min_time - time_delta)
+                average_time.append(time_delta)
+                sys.stdout.write('\r' + 'Sim: ' + str(sum(average_time)/len(average_time)))
                 # snapshot = self.collect_client.world.get_snapshot()
                 # print(f"World Tick: {snapshot.frame}, {snapshot.timestamp.elapsed_seconds}")
                 if (frame_count+1)%int(scene_config["keyframe_time"]/self.collect_client.settings.fixed_delta_seconds) == 0:
@@ -108,11 +127,11 @@ class Generator:
                                         is_key_frame = True
 
                                     samples_data_token[sensor.name] = self.dataset.update_sample_data(samples_data_token[sensor.name],
-                                                                                                      calibrated_sensors_token[sensor.name],
-                                                                                                      sample_token,
-                                                                                                      ego_pose_token,
-                                                                                                      is_key_frame,
-                                                                                                      *self.collect_client.get_sample_data(sample_data))
+                                                                                                        calibrated_sensors_token[sensor.name],
+                                                                                                        sample_token,
+                                                                                                        ego_pose_token,
+                                                                                                        is_key_frame,
+                                                                                                        *self.collect_client.get_sample_data(sample_data))
                                     
                                 except Empty:
                                     #print(f"No Sensor data was available for {sensor.name}")
@@ -157,7 +176,14 @@ class Generator:
                     # for sensor in self.collect_client.sensors:
                     #     sensor.get_data_list().queue.clear()
                     #print(f"{frame_count}: Clearing Sensor data took: {(datetime.datetime.now()-start_time).total_seconds()}")
-        except:
-            traceback.print_exc()
+            error = ''
+        except RuntimeError:
+            #traceback.print_exc()
+            error = str(sys.exc_info()[1])
+            print(f"Internal: {error}")
         finally:
-            self.collect_client.destroy_scene()
+            if "time-out" in error or "futures" in error:
+                print("Scene Timeout")
+                sys.exit(1)
+            else:
+                self.collect_client.destroy_scene()

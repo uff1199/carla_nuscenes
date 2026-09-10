@@ -118,18 +118,25 @@ class Client:
         self.client_port = client_config['port']
         self.client_host = client_config['host']
         self.client_timout = client_config['time_out']
+
+        self.reload_iters = client_config['reload_iters']
         
         self.principal_lidar = 'LIDAR_TOP_SPINNING'
 
         self.debug=False
 
-    def generate_world(self,world_config):
+    def generate_world(self,world_config, force_reload=False):
         print("generate world start!")
         self.client = carla.Client(self.client_host,self.client_port)
         self.client.set_timeout(self.client_timout)
 
-        self.client.load_world_if_different(world_config["map_name"])
-        self.world = self.client.get_world()
+        if not force_reload:
+            self.client.load_world_if_different(world_config["map_name"])
+            self.world = self.client.get_world()
+        else:
+            self.world = self.client.load_world(world_config["map_name"])
+            
+            
         self.original_settings = self.world.get_settings()
         self.world.unload_map_layer(carla.MapLayer.ParkedVehicles)
         self.ego_vehicle = None
@@ -144,14 +151,19 @@ class Client:
         #get_attribute = lambda bp: ["vehicle.moving"] if bp.id.split(".")[0] == "vehicle" else ["pedestrian.moving"] if bp.id.split(".")[0] == "walker" else None
         self.attribute_dict = {bp.id: get_attribute(bp) for bp in self.world.get_blueprint_library()}
 
-        self.trafficmanager = self.client.get_trafficmanager()
-        self.trafficmanager.set_synchronous_mode(True)
-        self.trafficmanager.set_respawn_dormant_vehicles(True)
+
         self.settings = carla.WorldSettings(**world_config["settings"])
         self.settings.synchronous_mode = True
         self.settings.no_rendering_mode = False
+        self.settings.tile_stream_distance = 2000
+        self.settings.actor_active_distance = 2000
         self.world.apply_settings(self.settings)
         self.world.set_pedestrians_cross_factor(1)
+        
+        self.trafficmanager = self.client.get_trafficmanager()
+        self.trafficmanager.set_synchronous_mode(True)
+        self.trafficmanager.set_respawn_dormant_vehicles(True)
+        self.trafficmanager.set_boundaries_respawn_dormant_vehicles(500,500)
         print("generate world success!")
 
     def generate_scene(self,scene_config):
@@ -277,6 +289,9 @@ class Client:
         self.trafficmanager.distance_to_leading_vehicle(self.ego_vehicle.get_actor(),5.0)
         self.trafficmanager.vehicle_percentage_speed_difference(self.ego_vehicle.get_actor(),-20)
         self.trafficmanager.auto_lane_change(self.ego_vehicle.get_actor(), True)
+        self.trafficmanager.set_osm_mode(True)
+
+        print(f"Spawn Vehicle at: {ego_location}")
 
         if 'distance' in scene_config and 'spawns' in scene_config:
             
@@ -293,11 +308,13 @@ class Client:
         else:
             nearby_spawn_points = spawn_points
             nearby_spawn_points = nearby_spawn_points[0:250]
-        print("Spawn Vehicles")
+        print(f"Spawn Vehicles: {len(nearby_spawn_points)}")
         vehicle_bp_list = self.world.get_blueprint_library().filter("vehicle")
         vehicle_bp_list = [bp for bp in vehicle_bp_list if bp.id != "vehicle..ballooncar"]
         self.vehicles = []
-        for spawn_point in nearby_spawn_points[1:random.randint(int(len(nearby_spawn_points)*0.1),len(nearby_spawn_points))]:
+        no_of_vehicles = random.randint(int(len(nearby_spawn_points)*0.1),len(nearby_spawn_points))
+        print(f"Try to spawn {no_of_vehicles} vehicles.")
+        for spawn_point in nearby_spawn_points[1:no_of_vehicles]:
             location = {attr:getattr(spawn_point.location,attr) for attr in ["x","y","z"]}
             rotation = {attr:getattr(spawn_point.rotation,attr) for attr in ["yaw","pitch","roll"]}
             bp_name = random.choice(vehicle_bp_list).id
@@ -327,8 +344,10 @@ class Client:
             if spawn != None:
                 if spawn.distance(spawn_points[0].location) < scene_config['distance']:
                     spawns_walkers.add(spawn)
+            else:
+                print("No - spawn found")
         print(f"No of WalkerLocations near the vehicle {len(spawns_walkers)}")
-        selected = random.randint(10,250)
+        selected = random.randint(10,200)
         spawns_walkers = list(spawns_walkers)
         for spawn in spawns_walkers[0:selected]:
         
@@ -339,8 +358,8 @@ class Client:
             rotation = {"yaw":random.random()*360,"pitch":random.random()*360,"roll":random.random()*360}
             self.walkers.append(Walker(world=self.world,location=spawn_location,rotation=rotation,destination=destination_location,bp_name=bp_name))
 
-        debug = False
-        if debug:
+  
+        if self.debug:
             from matplotlib import pyplot as plt
 
             spawn_points_xy = np.array([(sp.location.x, sp.location.y) for sp in  spawn_points])
@@ -371,7 +390,7 @@ class Client:
             # else:
             #     print(response.error)
         self.walkers = list(filter(lambda walker:walker.get_actor(),self.walkers))
-        print("Spawn Walkers")
+        print(f"Spawn Walkers: {len(self.walkers)}")
         walker_controller_bp = self.world.get_blueprint_library().find('controller.ai.walker')
         walkers_controller_batch = [SpawnActor(walker_controller_bp,carla.Transform(),walker.get_actor()) for walker in self.walkers]
         for i,response in enumerate(self.client.apply_batch_sync(walkers_controller_batch)):
@@ -381,8 +400,8 @@ class Client:
                         self.walkers[i].get_actor().set_simulate_physics(True)
                     else:
                         walkers_success = False
-                    # else:
-                    #     print(response.error)
+                        print(response.error)
+
         self.world.tick()
         for walker in self.walkers:
             walker.start()
@@ -390,6 +409,7 @@ class Client:
         ## Wait for a few simulation steps until the vehicles have stopped falling down
         print("Wait for Actors to settle")
         for i in range(0,int(0.5/self.settings.fixed_delta_seconds)):
+            #print("Tick")
             self.world.tick()
 
         if not vehicle_success and not walkers_success:
@@ -411,19 +431,22 @@ class Client:
     def destroy_scene(self):
         if self.walkers is not None:
             for walker in self.walkers:
-                walker.controller.stop()
-                if self.world.get_actor(walker.id) != None:
+                if self.world.get_actor(walker.id) != None and walker.actor.is_alive:
+                    walker.controller.stop()
                     walker.destroy()
         if self.vehicles is not None:
             for vehicle in self.vehicles:
-                if self.world.get_actor(vehicle.id) != None:
+                if self.world.get_actor(vehicle.id) != None and vehicle.actor.is_alive:
                     vehicle.destroy()
         if self.sensors is not None:
             for sensor in self.sensors:
                 if self.world.get_actor(sensor.id) != None:
+                    sensor.actor.stop()
+                    time.sleep(0.5)
                     sensor.destroy()
         if self.ego_vehicle.actor is not None:
-            self.ego_vehicle.destroy()
+            if self.world.get_actor(self.ego_vehicle.id) != None and self.ego_vehicle.actor.is_alive:
+                self.ego_vehicle.destroy()
 
 
     def destroy_world(self):
@@ -483,7 +506,7 @@ class Client:
         num_radar_pts = 0
         if no_pts>0:
             for sensor in self.sensors:
-                if ((sensor.bp_name == 'sensor.lidar.ray_cast') or (sensor.bp_name == 'sensor.lidar.thi_lidar')):
+                if ('lidar' in sensor):
                     num_lidar_pts += self.get_num_lidar_pts(instance,sensor.get_last_data(),sensor.get_transform())
                 elif sensor.bp_name == 'sensor.other.radar':
                     num_radar_pts += self.get_num_radar_pts(instance,sensor.get_last_data(),sensor.get_transform())

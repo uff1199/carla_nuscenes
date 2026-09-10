@@ -8,7 +8,8 @@ dataset:
 client:
   host: localhost
   port: 2000
-  time_out: 10.0
+  time_out: 20.0
+  reload_iters: 30
 
 sensors:
   !include ./configs/sensors.yaml
