@@ -4,6 +4,7 @@ from .utils import load,dump,generate_token
 import carla
 from .sensor import parse_lidar_data,parse_radar_data, parse_thi_lidar_data, LidarSnapshot, THILidarSnapshot, RadarSnapshot, CameraSnapshot
 from copy import deepcopy
+import time
 
 def save_image(image,path):
     #print("SaveImage")
@@ -226,7 +227,7 @@ class Dataset:
 
     def update_sample(self,prev,scene_token,timestamp,replace=True):
         sample_item = {}
-        sample_item["token"] = generate_token("sample",scene_token+str(timestamp))
+        sample_item["token"] = generate_token("sample",scene_token+str(round(time.time_ns() / 1e6)))
         sample_item["timestamp"] = timestamp
         sample_item["prev"] = prev
         sample_item["next"] = ""
@@ -276,7 +277,7 @@ class Dataset:
 
     def update_ego_pose(self,scene_token,calibrated_sensor_token,timestamp,translation,rotation,replace=True):
         ego_pose_item = {}
-        ego_pose_item["token"] = generate_token("ego_pose",scene_token+calibrated_sensor_token+str(timestamp))
+        ego_pose_item["token"] = generate_token("ego_pose",scene_token+calibrated_sensor_token+str(round(time.time_ns() / 1e6)))
         ego_pose_item["timestamp"] = timestamp
         ego_pose_item["rotation"] = rotation
         ego_pose_item["translation"] = translation

@@ -16,8 +16,10 @@ class Actor:
         self.actor = self.world.get_actor(id)
         self.id = id
 
+
     def spawn_actor(self):
         self.actor = self.world.spawn_actor(self.blueprint,self.transform,self.attach_to)
+        self.id = self.actor.id
 
     def get_actor(self):
         return self.actor
