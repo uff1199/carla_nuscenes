@@ -5,9 +5,10 @@ from queue import Queue
 from PIL import Image
 
 class SensorSnapshot:
-    __slots__ = ("timestamp",)
+    __slots__ = ("timestamp","frame")
     def __init__(self, sensor_data):
         self.timestamp = sensor_data.timestamp
+        self.frame = sensor_data.frame
 
 class LidarSnapshot(SensorSnapshot):
     __slots__ = ("raw_data", "channels", "_point_counts")

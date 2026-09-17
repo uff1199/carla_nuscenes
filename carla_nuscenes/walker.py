@@ -32,4 +32,4 @@ class Walker(Actor):
         return self.actor.bounding_box.get_world_vertices(self.actor.get_transform())
 
     def get_size(self):
-        return self.actor.bounding_box.extent*2
+        return self.actor.bounding_box.extent*2.25

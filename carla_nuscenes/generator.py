@@ -89,7 +89,31 @@ class Generator:
             sample_token = ""
             average_time = []
             min_time=scene_config['client_time']
-            # print(f"Delta Sim: {self.collect_client.settings.fixed_delta_seconds}, Max. Frame: {int(scene_config['collect_time']/self.collect_client.settings.fixed_delta_seconds)}, Divider {int(scene_config['keyframe_time']/self.collect_client.settings.fixed_delta_seconds)}")
+
+
+            # Warmup to synchronize sensors:
+            warmup_frames = 1
+            for i in range(warmup_frames):
+                self.collect_client.tick()
+                snapshot = self.collect_client.world.get_snapshot()
+                print(f"World Tick: {snapshot.frame}, {snapshot.timestamp.elapsed_seconds}")
+            for sensor in self.collect_client.sensors:
+                if sensor.bp_name in self.perception_sensors:
+                    #print(f"{frame_count} Do for Sensor: {sensor.bp_name}, #No. of Samples: {len(sensor.get_data_list())}")
+                    #for idx in range(sensor.get_data_list().qsize):
+                    timeout = .05
+                    idx = 0
+                    frame_rate = sensor.frame_rate if sensor.frame_rate != 0.0 else 1 / self.collect_client.settings.fixed_delta_seconds
+                    while True:
+                        try:
+                            sample_data = sensor.get_data_list().get(timeout=timeout) # Blocks and waits until sensor data is available
+                            idx +=1
+                            #print(f"Got Warmup of  {idx} - {sample_data[1].timestamp:.10f} - {sample_data[1].frame} - {sensor.name}") 
+                        except Empty:
+                            if self.collect_client.settings.fixed_delta_seconds * warmup_frames <=  idx * sensor.frame_rate:
+                                break
+            self.collect_client.tick()
+
             for frame_count in range(int(scene_config['collect_time']/self.collect_client.settings.fixed_delta_seconds)):
                 t0 = time.time_ns()
                 self.collect_client.tick()
@@ -102,6 +126,8 @@ class Generator:
                 # snapshot = self.collect_client.world.get_snapshot()
                 # print(f"World Tick: {snapshot.frame}, {snapshot.timestamp.elapsed_seconds}")
                 if (frame_count+1)%int(scene_config["keyframe_time"]/self.collect_client.settings.fixed_delta_seconds) == 0:
+                    #print("\n ------------------------------------- ")
+                    #print(f"- Collect Client: {self.collect_client.world.get_snapshot().timestamp.elapsed_seconds} - {self.collect_client.world.get_snapshot().frame}")
                     sample_token = self.dataset.update_sample(sample_token,scene_token,*self.collect_client.get_sample())
                     #start_time = datetime.datetime.now()
                     principal_lidar_sensor_data = None
@@ -117,6 +143,7 @@ class Generator:
                             while True:
                                 try:
                                     sample_data = sensor.get_data_list().get(timeout=timeout) # Blocks and waits until sensor data is available
+                                    #print(f"Frame Count: {frame_count} - Got {idx} - {sample_data[1].timestamp:.10f} - {sample_data[1].frame} - {sensor.name}") 
                                     idx +=1
                                     if sensor.name == self.collect_client.principal_lidar:
                                         principal_lidar_sensor_data = sample_data

@@ -199,11 +199,11 @@ sensors:
   #-----------lidar----------
   - 
     name: 'LIDAR_TOP'
-    bp_name: 'sensor.lidar.thi_lidar'
+    bp_name: 'sensor.lidar.gbuffer_lidar'
     location: 
       x: 0
       y: 0
-      z: 1.383
+      z: 1.54
     rotation:
       yaw: 0
       pitch: 0
@@ -212,18 +212,22 @@ sensors:
       'lidar_vertical_fov': '0'
       'lidar_horizontal_fov': '118'
       'update_rate': '10'
-      'horizontal_resolution': '0.1'
+      'horizontal_resolution': '0.2'
       'max_range': '80'
       'sensor_tick': '0.1'
       'rain_intensity': '0.0'
       'snow_intensity': '0.0'
       'fog_distance': '0.0'
       'threshold_minus_five': '0.00005'
-      'tone_map_offset': '1.0' 
+      'tone_map_offset': '0.3183098861837907' 
       'lines': '55'
       'intensity_mode': '2' # Atmospheric Attenuation + Reflectivity
       'reflectivity_mode': '0'
-      'gbuff_resolution': '0.2'
+      'gbuffer_resolution': '1200'
+      'scan_pattern': "-59.0,-27.0|0.003614,0.210658,12.636217|0.004143,0.251881,-11.267221;
+                      -30.0,2.0|0.003170,0.193266,11.961567|0.004184,0.267362,-10.912902;
+                      -2.0,30.0|0.003170,-0.193266,11.961567|0.004184,-0.267362,-10.912902;
+                      27.0,59.0|0.003614,-0.210658,12.636217|0.004143,-0.251881,-11.267221"
 
 
 #-----------lidar Default----------
@@ -233,7 +237,7 @@ sensors:
     location: 
       x: 0
       y: 0
-      z: 1.539
+      z: 1.54
     rotation:
       yaw: 0
       pitch: 0
@@ -252,7 +256,7 @@ sensors:
 
   - 
     name: 'LIDAR_TOP_SPINNING'
-    bp_name: 'sensor.lidar.thi_rotational_lidar'
+    bp_name: 'sensor.lidar.gbuffer_rotational_lidar'
     location: 
       x: 0
       y: 0
@@ -274,42 +278,73 @@ sensors:
       'snow_intensity': '0.0'
       'fog_distance': '0.0'
       'threshold_minus_five': '0.00005'
-      #'tone_map_offset': '0.3183098861837907' 
-      'tone_map_offset': '1.0' 
+      'tone_map_offset': '0.3183098861837907' 
       'lines': '55'
       'intensity_mode': '1' # Atmospheric Attenuation
       'reflectivity_mode': '0'
-      'gbuff_resolution': '0.2'
+      'gbuffer_resolution': '1200'
   - 
-    name: 'LIDAR_TOP_VOXELSCAPE'
-    bp_name: 'sensor.lidar.thi_rotational_lidar'
+    name: 'LIDAR_TOP_SPINNING_KITTI'
+    bp_name: 'sensor.lidar.gbuffer_rotational_lidar'
     location: 
       x: 0
       y: 0
-      z: 1.84
+      z: 1.74
     rotation:
       yaw: 0
       pitch: 0
       roll: 0
     options: 
-      'lidar_vertical_fov': '40.0'
-      'lidar_vertical_fov_low': '-30.0'
+      'lidar_vertical_fov': '26.8'
+      'lidar_vertical_fov_low': '-24.8'
+      'lidar_horizontal_fov': '360'
+      'update_rate': '10'
+      'horizontal_resolution': '0.08'
+      'vertical_resolution': '0.41875'
+      'max_range': '120'
+      'sensor_tick': '0.1'
+      'rain_intensity': '0.0'
+      'snow_intensity': '0.0'
+      'fog_distance': '0.0'
+      'threshold_minus_five': '0.00005'
+      'tone_map_offset': '0.3183098861837907' 
+      'lines': '55'
+      'intensity_mode': '3' # Atmospheric Attenuation + NearFieldEffect
+      'nearfield_param_a': '0.00353051'
+      'nearfield_param_b': '3.65068927'
+      'atmosphere_attenuation_rate': '0.05305697'
+      'reflectivity_mode': '0'
+      'gbuffer_resolution': '1200'
+  - 
+    name: 'LIDAR_TOP_RAYCAST'
+    bp_name: 'sensor.lidar.thi_rotational_lidar'
+    location: 
+      x: 0
+      y: 0
+      z: 1.73
+    rotation:
+      yaw: 0
+      pitch: 0
+      roll: 0
+    options: 
+      'lidar_vertical_fov': '26.8'
+      'lidar_vertical_fov_low': '-24.8'
       'lidar_horizontal_fov': '360'
       'update_rate': '20'
-      'horizontal_resolution': '0.33'
-      'vertical_resolution': '1.25'
+      'horizontal_resolution': '0.08'
+      'vertical_resolution': '0.41875'
       'max_range': '80'
       'sensor_tick': '0.05'
       'rain_intensity': '0.0'
       'snow_intensity': '0.0'
       'fog_distance': '0.0'
       'threshold_minus_five': '0.00005'
-      #'tone_map_offset': '0.3183098861837907' 
-      'tone_map_offset': '1.0' 
+      'tone_map_offset': '0.3183098861837907' 
       'lines': '55'
       'intensity_mode': '1' # Atmospheric Attenuation
-      'reflectivity_mode': '1'
-      'gbuff_resolution': '0.2'
+      'reflectivity_mode': '0'
+      'gbuffer_resolution': '360'
+
 
   #-----------gnss----------
   - 
